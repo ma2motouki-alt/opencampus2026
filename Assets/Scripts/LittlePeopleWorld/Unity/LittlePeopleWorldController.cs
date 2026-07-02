@@ -1,0 +1,432 @@
+using System.Collections.Generic;
+using LittlePeopleWorld.Application;
+using LittlePeopleWorld.Domain;
+using LittlePeopleWorld.Input;
+using LittlePeopleWorld.Master;
+using UnityEngine;
+
+namespace LittlePeopleWorld.Unity
+{
+    public sealed class LittlePeopleWorldController : MonoBehaviour
+    {
+        [SerializeField] Camera targetCamera;
+        [SerializeField] MouseInputProviderBehaviour mouseInputProvider;
+        [SerializeField] int worldPresetId = 1;
+        [SerializeField] float worldHeight = 10f;
+        [SerializeField] bool showHelpOverlay = true;
+
+        readonly List<LittlePersonView> littlePersonViews = new();
+        readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
+        readonly Dictionary<int, WalkableSurfaceView> walkableSurfaceViews = new();
+        readonly Dictionary<int, PropObstacleView> propObstacleViews = new();
+        readonly Dictionary<int, AmbientObjectView> ambientObjectViews = new();
+        readonly Dictionary<int, VisualEffectView> visualEffectViews = new();
+
+        MasterDatabase masters;
+        World world;
+        LittlePeopleWorldOrchestrator orchestrator;
+        NormalizedScreenMapper mapper;
+        Transform littlePeopleRoot;
+        Transform objectsRoot;
+        Transform surfacesRoot;
+        Transform obstaclesRoot;
+        Transform ambientRoot;
+        Transform effectsRoot;
+
+        public MasterDatabase Masters => masters;
+        public World World => world;
+        public IInteractionInputProvider InputProvider => mouseInputProvider;
+
+        void Awake()
+        {
+            EnsureRuntime();
+        }
+
+        void Start()
+        {
+            BuildWorld();
+        }
+
+        void Update()
+        {
+            EnsureRuntime();
+            if (world == null)
+            {
+                BuildWorld();
+            }
+
+            world.SetDisplayAspect(mapper.WorldWidth / mapper.WorldHeight);
+            orchestrator.AdvanceFrame(Time.deltaTime, mouseInputProvider.InteractionObjects);
+            world = orchestrator.World;
+
+            SyncLittlePeopleViews();
+            SyncInteractionObjectViews();
+            SyncWalkableSurfaceViews();
+            SyncPropObstacleViews();
+            SyncAmbientObjectViews();
+            SyncVisualEffectViews();
+        }
+
+        void OnGUI()
+        {
+            if (mouseInputProvider == null || !mouseInputProvider.DebugEnabled || !showHelpOverlay)
+            {
+                return;
+            }
+
+            var text =
+                "Little People World MVP\n" +
+                "1 Hand  2 Round  3 Bar\n" +
+                "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
+                $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}";
+
+            var style = new GUIStyle(GUI.skin.box)
+            {
+                alignment = TextAnchor.UpperLeft,
+                fontSize = 14,
+                normal = { textColor = new Color(0.85f, 1f, 0.95f, 1f) }
+            };
+
+            GUI.Box(new Rect(16f, 16f, 460f, 94f), text, style);
+        }
+
+        void EnsureRuntime()
+        {
+            if (masters == null)
+            {
+                masters = MasterDatabase.CreateDefault();
+            }
+
+            if (orchestrator == null)
+            {
+                orchestrator = new LittlePeopleWorldOrchestrator(masters);
+            }
+
+            if (targetCamera == null)
+            {
+                targetCamera = Camera.main;
+            }
+
+            if (targetCamera == null)
+            {
+                var cameraObject = new GameObject("Main Camera");
+                targetCamera = cameraObject.AddComponent<Camera>();
+                targetCamera.tag = "MainCamera";
+            }
+
+            targetCamera.orthographic = true;
+            targetCamera.orthographicSize = worldHeight * 0.5f;
+            targetCamera.transform.position = new Vector3(0f, 0f, -10f);
+            targetCamera.transform.rotation = Quaternion.identity;
+            targetCamera.clearFlags = CameraClearFlags.SolidColor;
+            targetCamera.backgroundColor = masters.WorldPresets.Get(worldPresetId).BackgroundColor;
+            mapper = new NormalizedScreenMapper(targetCamera, worldHeight);
+
+            if (mouseInputProvider == null)
+            {
+                mouseInputProvider = GetComponent<MouseInputProviderBehaviour>();
+            }
+
+            if (mouseInputProvider == null)
+            {
+                mouseInputProvider = gameObject.AddComponent<MouseInputProviderBehaviour>();
+            }
+
+            mouseInputProvider.Initialize(masters, targetCamera);
+        }
+
+        void BuildWorld()
+        {
+            world = orchestrator.CreateWorld(worldPresetId);
+            littlePeopleRoot = CreateRoot("Little People");
+            objectsRoot = CreateRoot("Interaction Objects");
+            surfacesRoot = CreateRoot("Walkable Surfaces");
+            obstaclesRoot = CreateRoot("Prop Obstacles");
+            ambientRoot = CreateRoot("Ambient Objects");
+            effectsRoot = CreateRoot("Visual Effects");
+            BuildLittlePersonViews();
+        }
+
+        Transform CreateRoot(string rootName)
+        {
+            var root = new GameObject(rootName);
+            root.transform.SetParent(transform, false);
+            return root.transform;
+        }
+
+        void BuildLittlePersonViews()
+        {
+            foreach (var view in littlePersonViews)
+            {
+                if (view != null)
+                {
+                    Destroy(view.gameObject);
+                }
+            }
+
+            littlePersonViews.Clear();
+
+            foreach (var person in world.LittlePeople)
+            {
+                var viewObject = new GameObject("Little Person");
+                viewObject.transform.SetParent(littlePeopleRoot, false);
+                var view = viewObject.AddComponent<LittlePersonView>();
+                view.Initialize();
+                littlePersonViews.Add(view);
+            }
+        }
+
+        void SyncLittlePeopleViews()
+        {
+            for (var i = 0; i < world.LittlePeople.Count && i < littlePersonViews.Count; i++)
+            {
+                var person = world.LittlePeople[i];
+                var archetype = masters.LittlePersonArchetypes.Get(person.ArchetypeId);
+                littlePersonViews[i].Render(person, archetype, mapper);
+            }
+        }
+
+        void SyncInteractionObjectViews()
+        {
+            var liveIds = new HashSet<int>();
+
+            foreach (var interactionObject in world.InteractionObjects)
+            {
+                liveIds.Add(interactionObject.Id);
+                if (!interactionObjectViews.TryGetValue(interactionObject.Id, out var view))
+                {
+                    var viewObject = new GameObject($"Interaction Object {interactionObject.Id}");
+                    viewObject.transform.SetParent(objectsRoot, false);
+                    view = viewObject.AddComponent<InteractionObjectView>();
+                    view.Initialize();
+                    interactionObjectViews.Add(interactionObject.Id, view);
+                }
+
+                var field = FindField(interactionObject.Id);
+                var typeMaster = masters.GetObjectType(interactionObject.Kind);
+                view.Render(
+                    interactionObject,
+                    field,
+                    typeMaster,
+                    mapper,
+                    mouseInputProvider.DebugEnabled,
+                    interactionObject.Id == mouseInputProvider.SelectedObjectId);
+            }
+
+            RemoveDeadInteractionViews(liveIds);
+        }
+
+        void SyncWalkableSurfaceViews()
+        {
+            var liveIds = new HashSet<int>();
+
+            foreach (var surface in world.WalkableSurfaces)
+            {
+                liveIds.Add(surface.Id);
+                if (!walkableSurfaceViews.TryGetValue(surface.Id, out var view))
+                {
+                    var viewObject = new GameObject($"Walkable Surface {surface.Id}");
+                    viewObject.transform.SetParent(surfacesRoot, false);
+                    view = viewObject.AddComponent<WalkableSurfaceView>();
+                    view.Initialize();
+                    walkableSurfaceViews.Add(surface.Id, view);
+                }
+
+                view.Render(surface, mapper, mouseInputProvider.DebugEnabled);
+            }
+
+            RemoveDeadWalkableSurfaceViews(liveIds);
+        }
+
+        void SyncPropObstacleViews()
+        {
+            var liveIds = new HashSet<int>();
+
+            foreach (var obstacle in world.PropObstacles)
+            {
+                liveIds.Add(obstacle.Id);
+                if (!propObstacleViews.TryGetValue(obstacle.Id, out var view))
+                {
+                    var viewObject = new GameObject($"Prop Obstacle {obstacle.Id}");
+                    viewObject.transform.SetParent(obstaclesRoot, false);
+                    view = viewObject.AddComponent<PropObstacleView>();
+                    view.Initialize();
+                    propObstacleViews.Add(obstacle.Id, view);
+                }
+
+                view.Render(obstacle, mapper, mouseInputProvider.DebugEnabled);
+            }
+
+            RemoveDeadPropObstacleViews(liveIds);
+        }
+
+        void SyncAmbientObjectViews()
+        {
+            var liveIds = new HashSet<int>();
+
+            foreach (var ambientObject in world.AmbientObjects)
+            {
+                liveIds.Add(ambientObject.Id);
+                if (!ambientObjectViews.TryGetValue(ambientObject.Id, out var view))
+                {
+                    var viewObject = new GameObject($"Ambient Object {ambientObject.Id}");
+                    viewObject.transform.SetParent(ambientRoot, false);
+                    view = viewObject.AddComponent<AmbientObjectView>();
+                    view.Initialize();
+                    ambientObjectViews.Add(ambientObject.Id, view);
+                }
+
+                var typeMaster = masters.GetAmbientObjectType(ambientObject.Kind);
+                view.Render(ambientObject, typeMaster, mapper, mouseInputProvider.DebugEnabled);
+            }
+
+            RemoveDeadAmbientViews(liveIds);
+        }
+
+        void SyncVisualEffectViews()
+        {
+            var liveIds = new HashSet<int>();
+
+            foreach (var visualEffect in world.VisualEffects)
+            {
+                liveIds.Add(visualEffect.Id);
+                if (!visualEffectViews.TryGetValue(visualEffect.Id, out var view))
+                {
+                    var viewObject = new GameObject($"Visual Effect {visualEffect.Id}");
+                    viewObject.transform.SetParent(effectsRoot, false);
+                    view = viewObject.AddComponent<VisualEffectView>();
+                    view.Initialize();
+                    visualEffectViews.Add(visualEffect.Id, view);
+                }
+
+                var effectMaster = masters.VisualEffects.Get(visualEffect.VisualEffectMasterId);
+                view.Render(visualEffect, effectMaster, mapper);
+            }
+
+            RemoveDeadVisualEffectViews(liveIds);
+        }
+
+        InteractionField FindField(int sourceObjectId)
+        {
+            foreach (var field in world.InteractionFields)
+            {
+                if (field.SourceObjectId == sourceObjectId)
+                {
+                    return field;
+                }
+            }
+
+            return null;
+        }
+
+        void RemoveDeadInteractionViews(HashSet<int> liveIds)
+        {
+            var deadIds = new List<int>();
+            foreach (var pair in interactionObjectViews)
+            {
+                if (!liveIds.Contains(pair.Key))
+                {
+                    deadIds.Add(pair.Key);
+                }
+            }
+
+            foreach (var id in deadIds)
+            {
+                if (interactionObjectViews[id] != null)
+                {
+                    Destroy(interactionObjectViews[id].gameObject);
+                }
+
+                interactionObjectViews.Remove(id);
+            }
+        }
+
+        void RemoveDeadWalkableSurfaceViews(HashSet<int> liveIds)
+        {
+            var deadIds = new List<int>();
+            foreach (var pair in walkableSurfaceViews)
+            {
+                if (!liveIds.Contains(pair.Key))
+                {
+                    deadIds.Add(pair.Key);
+                }
+            }
+
+            foreach (var id in deadIds)
+            {
+                if (walkableSurfaceViews[id] != null)
+                {
+                    Destroy(walkableSurfaceViews[id].gameObject);
+                }
+
+                walkableSurfaceViews.Remove(id);
+            }
+        }
+
+        void RemoveDeadPropObstacleViews(HashSet<int> liveIds)
+        {
+            var deadIds = new List<int>();
+            foreach (var pair in propObstacleViews)
+            {
+                if (!liveIds.Contains(pair.Key))
+                {
+                    deadIds.Add(pair.Key);
+                }
+            }
+
+            foreach (var id in deadIds)
+            {
+                if (propObstacleViews[id] != null)
+                {
+                    Destroy(propObstacleViews[id].gameObject);
+                }
+
+                propObstacleViews.Remove(id);
+            }
+        }
+
+        void RemoveDeadAmbientViews(HashSet<int> liveIds)
+        {
+            var deadIds = new List<int>();
+            foreach (var pair in ambientObjectViews)
+            {
+                if (!liveIds.Contains(pair.Key))
+                {
+                    deadIds.Add(pair.Key);
+                }
+            }
+
+            foreach (var id in deadIds)
+            {
+                if (ambientObjectViews[id] != null)
+                {
+                    Destroy(ambientObjectViews[id].gameObject);
+                }
+
+                ambientObjectViews.Remove(id);
+            }
+        }
+
+        void RemoveDeadVisualEffectViews(HashSet<int> liveIds)
+        {
+            var deadIds = new List<int>();
+            foreach (var pair in visualEffectViews)
+            {
+                if (!liveIds.Contains(pair.Key))
+                {
+                    deadIds.Add(pair.Key);
+                }
+            }
+
+            foreach (var id in deadIds)
+            {
+                if (visualEffectViews[id] != null)
+                {
+                    Destroy(visualEffectViews[id].gameObject);
+                }
+
+                visualEffectViews.Remove(id);
+            }
+        }
+    }
+}
