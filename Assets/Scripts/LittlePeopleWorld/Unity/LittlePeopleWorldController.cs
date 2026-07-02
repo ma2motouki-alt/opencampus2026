@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using LittlePeopleWorld.Application;
 using LittlePeopleWorld.Domain;
@@ -7,10 +8,18 @@ using UnityEngine;
 
 namespace LittlePeopleWorld.Unity
 {
+    public enum InteractionInputProviderMode
+    {
+        Mouse = 1,
+        UdpRealSense = 2
+    }
+
     public sealed class LittlePeopleWorldController : MonoBehaviour
     {
         [SerializeField] Camera targetCamera;
+        [SerializeField] InteractionInputProviderMode inputProviderMode = InteractionInputProviderMode.Mouse;
         [SerializeField] MouseInputProviderBehaviour mouseInputProvider;
+        [SerializeField] UdpRealSenseInputProviderBehaviour udpRealSenseInputProvider;
         [SerializeField] int worldPresetId = 1;
         [SerializeField] float worldHeight = 10f;
         [SerializeField] bool showHelpOverlay = true;
@@ -32,10 +41,11 @@ namespace LittlePeopleWorld.Unity
         Transform obstaclesRoot;
         Transform ambientRoot;
         Transform effectsRoot;
+        IInteractionInputProvider activeInputProvider;
 
         public MasterDatabase Masters => masters;
         public World World => world;
-        public IInteractionInputProvider InputProvider => mouseInputProvider;
+        public IInteractionInputProvider InputProvider => activeInputProvider ?? mouseInputProvider;
 
         void Awake()
         {
@@ -56,7 +66,8 @@ namespace LittlePeopleWorld.Unity
             }
 
             world.SetDisplayAspect(mapper.WorldWidth / mapper.WorldHeight);
-            orchestrator.AdvanceFrame(Time.deltaTime, mouseInputProvider.InteractionObjects);
+            var inputProvider = InputProvider;
+            orchestrator.AdvanceFrame(Time.deltaTime, inputProvider?.InteractionObjects ?? Array.Empty<InteractionObject>());
             world = orchestrator.World;
 
             SyncLittlePeopleViews();
@@ -69,13 +80,15 @@ namespace LittlePeopleWorld.Unity
 
         void OnGUI()
         {
-            if (mouseInputProvider == null || !mouseInputProvider.DebugEnabled || !showHelpOverlay)
+            var inputProvider = InputProvider;
+            if (inputProvider == null || !inputProvider.DebugEnabled || !showHelpOverlay)
             {
                 return;
             }
 
             var text =
                 "Little People World MVP\n" +
+                $"Input: {InputProviderLabel()}\n" +
                 "1 Hand  2 Round  3 Bar\n" +
                 "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
                 $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}";
@@ -87,7 +100,7 @@ namespace LittlePeopleWorld.Unity
                 normal = { textColor = new Color(0.85f, 1f, 0.95f, 1f) }
             };
 
-            GUI.Box(new Rect(16f, 16f, 460f, 94f), text, style);
+            GUI.Box(new Rect(16f, 16f, 500f, 112f), text, style);
         }
 
         void EnsureRuntime()
@@ -122,6 +135,11 @@ namespace LittlePeopleWorld.Unity
             targetCamera.backgroundColor = masters.WorldPresets.Get(worldPresetId).BackgroundColor;
             mapper = new NormalizedScreenMapper(targetCamera, worldHeight);
 
+            EnsureInputProviders();
+        }
+
+        void EnsureInputProviders()
+        {
             if (mouseInputProvider == null)
             {
                 mouseInputProvider = GetComponent<MouseInputProviderBehaviour>();
@@ -133,6 +151,33 @@ namespace LittlePeopleWorld.Unity
             }
 
             mouseInputProvider.Initialize(masters, targetCamera);
+
+            if (inputProviderMode == InteractionInputProviderMode.UdpRealSense)
+            {
+                if (udpRealSenseInputProvider == null)
+                {
+                    udpRealSenseInputProvider = GetComponent<UdpRealSenseInputProviderBehaviour>();
+                }
+
+                if (udpRealSenseInputProvider == null)
+                {
+                    udpRealSenseInputProvider = gameObject.AddComponent<UdpRealSenseInputProviderBehaviour>();
+                }
+            }
+
+            activeInputProvider = inputProviderMode == InteractionInputProviderMode.UdpRealSense && udpRealSenseInputProvider != null
+                ? udpRealSenseInputProvider
+                : mouseInputProvider;
+
+            if (mouseInputProvider != null)
+            {
+                mouseInputProvider.enabled = activeInputProvider == mouseInputProvider;
+            }
+
+            if (udpRealSenseInputProvider != null)
+            {
+                udpRealSenseInputProvider.enabled = activeInputProvider == udpRealSenseInputProvider;
+            }
         }
 
         void BuildWorld()
@@ -204,13 +249,14 @@ namespace LittlePeopleWorld.Unity
 
                 var field = FindField(interactionObject.Id);
                 var typeMaster = masters.GetObjectType(interactionObject.Kind);
+                var debugEnabled = IsDebugEnabled();
                 view.Render(
                     interactionObject,
                     field,
                     typeMaster,
                     mapper,
-                    mouseInputProvider.DebugEnabled,
-                    interactionObject.Id == mouseInputProvider.SelectedObjectId);
+                    debugEnabled,
+                    interactionObject.Id == SelectedObjectId());
             }
 
             RemoveDeadInteractionViews(liveIds);
@@ -232,7 +278,7 @@ namespace LittlePeopleWorld.Unity
                     walkableSurfaceViews.Add(surface.Id, view);
                 }
 
-                view.Render(surface, mapper, mouseInputProvider.DebugEnabled);
+                view.Render(surface, mapper, IsDebugEnabled());
             }
 
             RemoveDeadWalkableSurfaceViews(liveIds);
@@ -254,7 +300,7 @@ namespace LittlePeopleWorld.Unity
                     propObstacleViews.Add(obstacle.Id, view);
                 }
 
-                view.Render(obstacle, mapper, mouseInputProvider.DebugEnabled);
+                view.Render(obstacle, mapper, IsDebugEnabled());
             }
 
             RemoveDeadPropObstacleViews(liveIds);
@@ -277,7 +323,7 @@ namespace LittlePeopleWorld.Unity
                 }
 
                 var typeMaster = masters.GetAmbientObjectType(ambientObject.Kind);
-                view.Render(ambientObject, typeMaster, mapper, mouseInputProvider.DebugEnabled);
+                view.Render(ambientObject, typeMaster, mapper, IsDebugEnabled());
             }
 
             RemoveDeadAmbientViews(liveIds);
@@ -317,6 +363,39 @@ namespace LittlePeopleWorld.Unity
             }
 
             return null;
+        }
+
+        bool IsDebugEnabled()
+        {
+            return InputProvider != null && InputProvider.DebugEnabled;
+        }
+
+        int SelectedObjectId()
+        {
+            return InputProvider == mouseInputProvider && mouseInputProvider != null
+                ? mouseInputProvider.SelectedObjectId
+                : -1;
+        }
+
+        string InputProviderLabel()
+        {
+            if (InputProvider is UdpRealSenseInputProviderBehaviour udpProvider)
+            {
+                var age = float.IsPositiveInfinity(udpProvider.PacketAgeSeconds)
+                    ? "no packet"
+                    : $"{udpProvider.PacketAgeSeconds:0.00}s ago";
+                var error = string.IsNullOrEmpty(udpProvider.LastError)
+                    ? string.Empty
+                    : $"  Error: {udpProvider.LastError}";
+                return $"UDP RealSense :{udpProvider.ListenPort}  Frame: {udpProvider.LastFrame}  Packet: {age}{error}";
+            }
+
+            if (InputProvider == mouseInputProvider)
+            {
+                return "Mouse";
+            }
+
+            return "None";
         }
 
         void RemoveDeadInteractionViews(HashSet<int> liveIds)

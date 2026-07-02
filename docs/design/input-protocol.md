@@ -62,7 +62,9 @@ Fields:
 
 `AmbientObject` is not input data. Clouds and stars are world-owned environmental objects that drift naturally and react when touched by little people.
 
-## Future UDP JSON
+## UDP JSON
+
+`UdpRealSenseInputProviderBehaviour` listens for UTF-8 UDP JSON on port `5005` by default. It implements the same `IInteractionInputProvider` boundary as the mouse provider.
 
 The Python vision app should send a frame-level message that contains the current list of interaction objects:
 
@@ -86,4 +88,11 @@ The Python vision app should send a frame-level message that contains the curren
 }
 ```
 
-Unity should treat the message as a replacement for the current input object set. The little-people world should not care whether the source is mouse input or RealSense input.
+Unity treats each message as a replacement for the current input object set. Objects that disappear from the `objects` array disappear from Unity input as well. The Python side does not need to send `removed` objects.
+
+Provider behavior:
+
+- `kind` defaults to `bar_prop` when omitted or unknown, so the first RealSense prototype can focus on dedicated bar props.
+- `state` defaults to `placed`; `dragging` can be sent when an object is intentionally moving.
+- If no UDP packet arrives for about one second, Unity clears the input objects.
+- The little-people world should not care whether the source is mouse input or RealSense input.
