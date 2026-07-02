@@ -36,3 +36,8 @@ Thumbs.db
 .codex/
 work/
 outputs/
+
+# Python local artifacts
+__pycache__/
+*.py[cod]
+.venv/

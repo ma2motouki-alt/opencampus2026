@@ -28,3 +28,6 @@ The first milestone intentionally does not use RealSense. It builds the little-p
 ## Documentation
 
 Design docs live in `docs/design/`.
+Team workflow docs live in `docs/development/`.
+
+The RealSense Python prototype lives in `python/realsense/`.
