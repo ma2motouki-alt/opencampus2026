@@ -24,6 +24,13 @@ namespace LittlePeopleWorld.Unity
                 0f);
         }
 
+        public Vector2 ToNormalized(Vector3 world)
+        {
+            return new Vector2(
+                Mathf.Clamp01(world.x / WorldWidth + 0.5f),
+                Mathf.Clamp01(0.5f - world.y / worldHeight));
+        }
+
         public Vector3 ToWorldScale(Vector2 normalizedSize)
         {
             return new Vector3(
@@ -38,4 +45,3 @@ namespace LittlePeopleWorld.Unity
         }
     }
 }
-
