@@ -75,14 +75,23 @@ Coordinate rules:
 
 ## RealSense Detection Strategy
 
-The prototype uses:
+The hand contour MVP uses:
 
 - RealSense D435 depth stream.
 - Baseline depth capture with no object on the display.
 - Height mask from `baseline_depth - current_depth`.
 - OpenCV contour extraction.
-- `cv2.minAreaRect` for center, size, and angle.
-- Homography calibration for camera-to-display mapping.
+- `cv2.approxPolyDP` for simplified hand contour points.
+- A front-view mapper for the first MVP.
+- A homography mapper for later oblique camera placement.
 - A small nearest-neighbor tracker for stable object ids.
 
-The first target is a dedicated bar prop sent as `bar_prop`. Better classification can be added later.
+The first target is a hand sent as `kind=hand`, `shape=contour`.
+The existing primitive contract remains valid for `bar_prop`, `round_prop`, and fallback hand rendering.
+
+Hand contour packets add:
+
+- `shape: "contour"`
+- `points: [{ "x": 0.0..1.0, "y": 0.0..1.0 }]`
+
+Unity renders contour hands with a `LineRenderer` and keeps the existing hand field for stable little-person reactions.

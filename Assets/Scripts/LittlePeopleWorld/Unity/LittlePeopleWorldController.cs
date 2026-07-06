@@ -23,6 +23,8 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] int worldPresetId = 1;
         [SerializeField] float worldHeight = 10f;
         [SerializeField] bool showHelpOverlay = true;
+        [SerializeField] bool enableRecognitionMaskAnimation = true;
+        [SerializeField] WorldSpaceMaskAnimationController maskAnimationController;
 
         readonly List<LittlePersonView> littlePersonViews = new();
         readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
@@ -76,6 +78,7 @@ namespace LittlePeopleWorld.Unity
             SyncPropObstacleViews();
             SyncAmbientObjectViews();
             SyncVisualEffectViews();
+            SyncRecognitionMaskAnimation();
         }
 
         void OnGUI()
@@ -171,12 +174,25 @@ namespace LittlePeopleWorld.Unity
 
             if (mouseInputProvider != null)
             {
-                mouseInputProvider.enabled = activeInputProvider == mouseInputProvider;
+                mouseInputProvider.enabled = ReferenceEquals(activeInputProvider, mouseInputProvider);
             }
 
             if (udpRealSenseInputProvider != null)
             {
-                udpRealSenseInputProvider.enabled = activeInputProvider == udpRealSenseInputProvider;
+                udpRealSenseInputProvider.enabled = ReferenceEquals(activeInputProvider, udpRealSenseInputProvider);
+            }
+        }
+
+        void EnsureRecognitionMaskAnimation()
+        {
+            if (maskAnimationController == null)
+            {
+                maskAnimationController = GetComponent<WorldSpaceMaskAnimationController>();
+            }
+
+            if (maskAnimationController == null)
+            {
+                maskAnimationController = gameObject.AddComponent<WorldSpaceMaskAnimationController>();
             }
         }
 
@@ -189,6 +205,7 @@ namespace LittlePeopleWorld.Unity
             obstaclesRoot = CreateRoot("Prop Obstacles");
             ambientRoot = CreateRoot("Ambient Objects");
             effectsRoot = CreateRoot("Visual Effects");
+            EnsureRecognitionMaskAnimation();
             BuildLittlePersonViews();
         }
 
@@ -352,6 +369,22 @@ namespace LittlePeopleWorld.Unity
             RemoveDeadVisualEffectViews(liveIds);
         }
 
+        void SyncRecognitionMaskAnimation()
+        {
+            if (!enableRecognitionMaskAnimation)
+            {
+                if (maskAnimationController != null)
+                {
+                    maskAnimationController.SetVisible(false);
+                }
+
+                return;
+            }
+
+            EnsureRecognitionMaskAnimation();
+            maskAnimationController.Render(world, masters, mapper, Time.deltaTime, IsDebugEnabled());
+        }
+
         InteractionField FindField(int sourceObjectId)
         {
             foreach (var field in world.InteractionFields)
@@ -372,7 +405,8 @@ namespace LittlePeopleWorld.Unity
 
         int SelectedObjectId()
         {
-            return InputProvider == mouseInputProvider && mouseInputProvider != null
+            var inputProvider = InputProvider;
+            return mouseInputProvider != null && ReferenceEquals(inputProvider, mouseInputProvider)
                 ? mouseInputProvider.SelectedObjectId
                 : -1;
         }
@@ -390,7 +424,7 @@ namespace LittlePeopleWorld.Unity
                 return $"UDP RealSense :{udpProvider.ListenPort}  Frame: {udpProvider.LastFrame}  Packet: {age}{error}";
             }
 
-            if (InputProvider == mouseInputProvider)
+            if (ReferenceEquals(InputProvider, mouseInputProvider))
             {
                 return "Mouse";
             }

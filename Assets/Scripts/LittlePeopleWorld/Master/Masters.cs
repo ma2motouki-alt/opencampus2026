@@ -389,6 +389,7 @@ namespace LittlePeopleWorld.Master
         public float MaxDeltaTime { get; }
         public float WorldEdgePadding { get; }
         public float InputHitPadding { get; }
+        public float HandContourReactionPadding { get; }
         public float EdgeAttachDistance { get; }
         public float ClimbSpeed { get; }
         public float BarTopDwellSeconds { get; }
@@ -410,6 +411,7 @@ namespace LittlePeopleWorld.Master
             float maxDeltaTime,
             float worldEdgePadding,
             float inputHitPadding,
+            float handContourReactionPadding,
             float edgeAttachDistance,
             float climbSpeed,
             float barTopDwellSeconds,
@@ -430,6 +432,7 @@ namespace LittlePeopleWorld.Master
             MaxDeltaTime = Mathf.Max(0.001f, maxDeltaTime);
             WorldEdgePadding = Mathf.Clamp01(worldEdgePadding);
             InputHitPadding = Mathf.Max(0f, inputHitPadding);
+            HandContourReactionPadding = Mathf.Max(0f, handContourReactionPadding);
             EdgeAttachDistance = Mathf.Max(0.001f, edgeAttachDistance);
             ClimbSpeed = Mathf.Max(0.001f, climbSpeed);
             BarTopDwellSeconds = Mathf.Max(0f, barTopDwellSeconds);
@@ -578,7 +581,7 @@ namespace LittlePeopleWorld.Master
 
             var tuning = new[]
             {
-                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 0.45f, 1.4f, 1.1f)
+                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 0.45f, 1.4f, 1.1f)
             };
 
             return new MasterDatabase(
