@@ -39,6 +39,8 @@ Fields:
 | `angle` | Degrees, clockwise-compatible with the Unity view |
 | `height` | Reserved for RealSense-derived height |
 | `state` | `placed`, `dragging`, or `removed` |
+| `shape` | Optional. `primitive` or `contour`. Defaults to `primitive`. |
+| `points` | Optional contour points for `shape=contour`, normalized with the same coordinate rules. |
 
 ## Mouse MVP
 
@@ -96,3 +98,42 @@ Provider behavior:
 - `state` defaults to `placed`; `dragging` can be sent when an object is intentionally moving.
 - If no UDP packet arrives for about one second, Unity clears the input objects.
 - The little-people world should not care whether the source is mouse input or RealSense input.
+
+## Hand Contour Extension
+
+Hand input can use the same frame-level UDP JSON while adding `shape=contour` and a `points` array.
+This keeps the existing `x`, `y`, `w`, and `h` values available for stable field reactions while allowing
+Unity to render a hand-like outline.
+
+```json
+{
+  "frame": 1280,
+  "timestamp": 12.48,
+  "objects": [
+    {
+      "id": 7,
+      "kind": "hand",
+      "shape": "contour",
+      "x": 0.42,
+      "y": 0.58,
+      "w": 0.22,
+      "h": 0.18,
+      "angle": 0,
+      "height": 0.06,
+      "state": "placed",
+      "points": [
+        { "x": 0.38, "y": 0.51 },
+        { "x": 0.44, "y": 0.49 },
+        { "x": 0.50, "y": 0.54 }
+      ]
+    }
+  ]
+}
+```
+
+Rules:
+
+- `points` are normalized display coordinates.
+- `x/y` are the contour center.
+- `w/h` are the contour bounding size and remain the fallback reaction size.
+- If `points` is absent or has fewer than three points, Unity falls back to primitive rendering.

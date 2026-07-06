@@ -5,7 +5,7 @@ import math
 import time
 
 from config import DEFAULT_OBJECT_KIND, SEND_RATE_HZ, UDP_HOST, UDP_PORT
-from udp_sender import UdpJsonSender
+from protocol.udp_sender import UdpJsonSender
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +26,8 @@ def build_dummy_object(args: argparse.Namespace, elapsed: float) -> dict:
     y = args.center_y + math.sin(elapsed * 0.6) * args.radius * 0.35
     angle = math.sin(elapsed * 0.7) * 28.0
     return {
+        **build_dummy_hand(args, x, y, elapsed)
+    } if args.kind == "hand" else {
         "id": 1,
         "kind": args.kind,
         "x": clamp01(x),
@@ -35,6 +37,41 @@ def build_dummy_object(args: argparse.Namespace, elapsed: float) -> dict:
         "angle": angle,
         "height": 0.04,
         "state": "placed",
+    }
+
+
+def build_dummy_hand(args: argparse.Namespace, center_x: float, center_y: float, elapsed: float) -> dict:
+    wave = math.sin(elapsed * 1.7) * 0.01
+    offsets = [
+        (-0.055, -0.010),
+        (-0.045, -0.070),
+        (-0.020, -0.105),
+        (-0.005, -0.050),
+        (0.012, -0.118),
+        (0.028, -0.050),
+        (0.052, -0.102),
+        (0.058, -0.030),
+        (0.090, -0.060),
+        (0.075, 0.008),
+        (0.058, 0.070),
+        (0.010, 0.092),
+        (-0.050, 0.070),
+    ]
+    points = [{"x": clamp01(center_x + x + wave), "y": clamp01(center_y + y)} for x, y in offsets]
+    xs = [point["x"] for point in points]
+    ys = [point["y"] for point in points]
+    return {
+        "id": 1,
+        "kind": "hand",
+        "shape": "contour",
+        "x": clamp01(sum(xs) / len(xs)),
+        "y": clamp01(sum(ys) / len(ys)),
+        "w": clamp01(max(xs) - min(xs)),
+        "h": clamp01(max(ys) - min(ys)),
+        "angle": 0.0,
+        "height": 0.05,
+        "state": "placed",
+        "points": points,
     }
 
 
@@ -58,7 +95,8 @@ def main() -> None:
                 sender.send_frame(sent_count, elapsed, [obj])
                 print(
                     f"send id={obj['id']} kind={obj['kind']} "
-                    f"x={obj['x']:.3f} y={obj['y']:.3f} angle={obj['angle']:.1f}",
+                    f"x={obj['x']:.3f} y={obj['y']:.3f} angle={obj['angle']:.1f} "
+                    f"points={len(obj.get('points', []))}",
                     end="\r",
                     flush=True,
                 )

@@ -237,6 +237,8 @@ namespace LittlePeopleWorld.Input
                 var state = ParseState(source.state);
                 var position = new Vector2(Mathf.Clamp01(source.x), Mathf.Clamp01(source.y));
                 var size = ParseSize(kind, source.w, source.h);
+                var shapeKind = ParseShape(source.shape, source.points);
+                var contourPoints = ParsePoints(source.points);
                 var previousPosition = position;
                 var previousTime = receiveTime;
                 var hasPrevious = trackedObjects.TryGetValue(id, out var previous);
@@ -253,7 +255,9 @@ namespace LittlePeopleWorld.Input
                     size,
                     source.angle,
                     source.height,
-                    state);
+                    state,
+                    shapeKind,
+                    contourPoints);
 
                 var deltaTime = Mathf.Max(0.0001f, receiveTime - previousTime);
                 var moved = hasPrevious && Vector2.Distance(previousPosition, position) > 0.0001f;
@@ -348,6 +352,30 @@ namespace LittlePeopleWorld.Input
             return new Vector2(safeWidth, safeHeight);
         }
 
+        static InteractionShapeKind ParseShape(string rawShape, PointDto[] points)
+        {
+            var value = (rawShape ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_");
+            return value == "contour" && points != null && points.Length >= 3
+                ? InteractionShapeKind.Contour
+                : InteractionShapeKind.Primitive;
+        }
+
+        static IReadOnlyList<Vector2> ParsePoints(PointDto[] source)
+        {
+            var points = new List<Vector2>();
+            if (source == null)
+            {
+                return points;
+            }
+
+            foreach (var point in source)
+            {
+                points.Add(new Vector2(Mathf.Clamp01(point.x), Mathf.Clamp01(point.y)));
+            }
+
+            return points;
+        }
+
         readonly struct TrackedObject
         {
             public readonly Vector2 Position;
@@ -374,6 +402,7 @@ namespace LittlePeopleWorld.Input
             public int id;
             public string kind;
             public string type;
+            public string shape;
             public float x;
             public float y;
             public float w;
@@ -381,6 +410,14 @@ namespace LittlePeopleWorld.Input
             public float angle;
             public float height;
             public string state;
+            public PointDto[] points;
+        }
+
+        [Serializable]
+        sealed class PointDto
+        {
+            public float x;
+            public float y;
         }
     }
 }

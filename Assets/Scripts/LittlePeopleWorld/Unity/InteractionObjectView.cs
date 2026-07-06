@@ -9,6 +9,7 @@ namespace LittlePeopleWorld.Unity
         SpriteRenderer shadowRenderer;
         SpriteRenderer edgeRenderer;
         SpriteRenderer fieldRenderer;
+        LineRenderer contourRenderer;
 
         public int SourceObjectId { get; private set; }
 
@@ -17,6 +18,7 @@ namespace LittlePeopleWorld.Unity
             fieldRenderer = CreateRenderer("Field", RuntimeSpriteFactory.Circle, -8);
             shadowRenderer = CreateRenderer("Shadow", RuntimeSpriteFactory.Circle, -2);
             edgeRenderer = CreateRenderer("Edge", RuntimeSpriteFactory.Circle, 5);
+            contourRenderer = CreateContourRenderer("Contour", 7);
         }
 
         public void Render(
@@ -36,7 +38,14 @@ namespace LittlePeopleWorld.Unity
             var objectSprite = isBar ? RuntimeSpriteFactory.Square : RuntimeSpriteFactory.Circle;
             shadowRenderer.sprite = objectSprite;
             edgeRenderer.sprite = objectSprite;
+            var canRenderContourKind = interactionObject.Kind == InteractionObjectKind.Hand ||
+                                       interactionObject.Kind == InteractionObjectKind.BarProp;
+            var shouldRenderContour = canRenderContourKind &&
+                                      interactionObject.ShapeKind == InteractionShapeKind.Contour &&
+                                      interactionObject.ContourPoints.Count >= 3;
 
+            shadowRenderer.enabled = !shouldRenderContour;
+            edgeRenderer.enabled = !shouldRenderContour;
             shadowRenderer.transform.localScale = objectScale;
             edgeRenderer.transform.localScale = objectScale * 1.08f;
 
@@ -53,6 +62,8 @@ namespace LittlePeopleWorld.Unity
             edgeColor.a = isSelected ? 0.88f : interactionObject.State == InteractionObjectState.Dragging ? 0.78f : 0.48f;
             edgeRenderer.color = edgeColor;
 
+            RenderContour(interactionObject, typeMaster, mapper, shouldRenderContour);
+
             fieldRenderer.enabled = debugEnabled;
             if (debugEnabled)
             {
@@ -67,6 +78,34 @@ namespace LittlePeopleWorld.Unity
             }
         }
 
+        void RenderContour(
+            InteractionObject interactionObject,
+            InteractionObjectTypeMaster typeMaster,
+            NormalizedScreenMapper mapper,
+            bool shouldRenderContour)
+        {
+            contourRenderer.enabled = shouldRenderContour;
+            if (!shouldRenderContour)
+            {
+                contourRenderer.positionCount = 0;
+                return;
+            }
+
+            var pointCount = interactionObject.ContourPoints.Count;
+            contourRenderer.positionCount = pointCount + 1;
+            for (var i = 0; i < pointCount; i++)
+            {
+                contourRenderer.SetPosition(i, mapper.ToWorld(interactionObject.ContourPoints[i]));
+            }
+            contourRenderer.SetPosition(pointCount, mapper.ToWorld(interactionObject.ContourPoints[0]));
+
+            var color = typeMaster.DebugColor;
+            color.a = 0.88f;
+            contourRenderer.startColor = color;
+            contourRenderer.endColor = color;
+            contourRenderer.widthMultiplier = Mathf.Max(0.015f, mapper.ToWorldRadius(0.0028f));
+        }
+
         SpriteRenderer CreateRenderer(string name, Sprite sprite, int sortingOrder)
         {
             var child = new GameObject(name);
@@ -74,6 +113,23 @@ namespace LittlePeopleWorld.Unity
             var renderer = child.AddComponent<SpriteRenderer>();
             renderer.sprite = sprite;
             renderer.sortingOrder = sortingOrder;
+            return renderer;
+        }
+
+        LineRenderer CreateContourRenderer(string name, int sortingOrder)
+        {
+            var child = new GameObject(name);
+            child.transform.SetParent(transform, false);
+            var renderer = child.AddComponent<LineRenderer>();
+            renderer.useWorldSpace = true;
+            renderer.loop = true;
+            renderer.textureMode = LineTextureMode.Stretch;
+            renderer.alignment = LineAlignment.View;
+            renderer.numCornerVertices = 2;
+            renderer.numCapVertices = 2;
+            renderer.sortingOrder = sortingOrder;
+            renderer.material = new Material(Shader.Find("Sprites/Default"));
+            renderer.enabled = false;
             return renderer;
         }
     }

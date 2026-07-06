@@ -10,7 +10,7 @@ Start Unity, switch `LittlePeopleWorldController` to `Udp Real Sense`, press Pla
 python test_sender.py --kind bar_prop
 ```
 
-## RealSense Prototype
+## RealSense Hand Contour Prototype
 
 Install dependencies:
 
@@ -23,10 +23,22 @@ pip install -r requirements.txt
 Run:
 
 ```powershell
-python realsense_detect.py
+python realsense_detect.py --kind hand
 ```
 
-The first version treats detected props as `bar_prop`.
+The MVP assumes a front-facing camera placement. It extracts hand-shaped contours from the depth difference between an empty display baseline and the current frame, then sends `kind=hand`, `shape=contour`, and simplified contour `points` to Unity.
+
+For an oblique camera placement, switch only the mapper:
+
+```powershell
+python realsense_detect.py --kind hand --mapper homography --calibration calibration.json
+```
+
+The detection pipeline is intentionally split so detection and coordinate mapping can evolve separately:
+
+```text
+detection -> mapping -> tracking -> protocol/udp_sender
+```
 
 ## Output Format
 
@@ -37,14 +49,21 @@ The first version treats detected props as `bar_prop`.
   "objects": [
     {
       "id": 1,
-      "kind": "bar_prop",
+      "kind": "hand",
+      "shape": "contour",
       "x": 0.5,
       "y": 0.5,
       "w": 0.18,
       "h": 0.04,
-      "angle": 10,
+      "angle": 0,
       "height": 0.03,
-      "state": "placed"
+      "state": "placed",
+      "points": [
+        { "x": 0.45, "y": 0.48 },
+        { "x": 0.51, "y": 0.50 },
+        { "x": 0.53, "y": 0.59 },
+        { "x": 0.47, "y": 0.63 }
+      ]
     }
   ]
 }
