@@ -1170,13 +1170,17 @@ namespace LittlePeopleWorld.Unity
 
         sealed class PlantViewRuntime : MonoBehaviour
         {
+            SpriteRenderer stemGlowRenderer;
             SpriteRenderer stemRenderer;
+            SpriteRenderer flowerGlowRenderer;
             SpriteRenderer flowerRenderer;
             SpriteRenderer flowerCenterRenderer;
 
             public void Initialize()
             {
+                stemGlowRenderer = CreateRenderer("StemGlow", RuntimeSpriteFactory.Circle, -3);
                 stemRenderer = CreateRenderer("Stem", RuntimeSpriteFactory.Square, 6);
+                flowerGlowRenderer = CreateRenderer("FlowerGlow", RuntimeSpriteFactory.Circle, 7);
                 flowerRenderer = CreateRenderer("Flower", RuntimeSpriteFactory.Star, 8);
                 flowerCenterRenderer = CreateRenderer("FlowerCenter", RuntimeSpriteFactory.Circle, 9);
             }
@@ -1208,9 +1212,18 @@ namespace LittlePeopleWorld.Unity
                 stemRenderer.transform.localRotation = Quaternion.FromToRotation(Vector3.up, bloomLocalPosition.normalized);
                 stemRenderer.color = stemColor;
 
+                // 茎のglow(発光ハロー)。茎本体と同じ位置・向きで、太さと丈をひと回り大きくして重ねる。
+                stemGlowRenderer.transform.localPosition = stemCenter;
+                stemGlowRenderer.transform.localScale = new Vector3(stemWidthWorld * 3.2f, stemHeightWorld * 1.05f, 1f);
+                stemGlowRenderer.transform.localRotation = stemRenderer.transform.localRotation;
+                var stemGlowColor = Color.Lerp(stemColor, Color.white, 0.5f);
+                stemGlowColor.a = Mathf.Lerp(0.16f, 0.04f, wilt);
+                stemGlowRenderer.color = stemGlowColor;
+
                 var showFlower = plant.CurrentStage is PlantStage.Blooming or PlantStage.Wilting;
                 flowerRenderer.enabled = showFlower;
                 flowerCenterRenderer.enabled = showFlower;
+                flowerGlowRenderer.enabled = showFlower;
                 if (!showFlower)
                 {
                     return;
@@ -1230,6 +1243,14 @@ namespace LittlePeopleWorld.Unity
                 flowerCenterRenderer.transform.localScale = Vector3.one * flowerBaseScale * 0.42f * bloomOpen;
                 flowerCenterRenderer.transform.localRotation = Quaternion.identity;
                 flowerCenterRenderer.color = Color.Lerp(Color.white, flowerColor, 0.35f);
+
+                // 花のglow(発光ハロー)。開閉(bloomOpen)には連動させず、常に一定サイズで淡く発光させる。
+                flowerGlowRenderer.transform.localPosition = bloomLocalPosition;
+                flowerGlowRenderer.transform.localScale = Vector3.one * flowerBaseScale * 2.4f;
+                flowerGlowRenderer.transform.localRotation = Quaternion.identity;
+                var flowerGlowColor = Color.Lerp(flowerColor, Color.white, 0.55f);
+                flowerGlowColor.a = Mathf.Lerp(0.32f, 0.05f, wilt);
+                flowerGlowRenderer.color = flowerGlowColor;
             }
 
             SpriteRenderer CreateRenderer(string rendererName, Sprite sprite, int sortingOrder)
