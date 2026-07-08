@@ -859,13 +859,18 @@ namespace LittlePeopleWorld.Domain
         public float CooldownSeconds { get; private set; }
         public bool IsReacting => ReactionSeconds > 0f;
 
+        public float EdgePadding { get; }
+        public float MaxCenterY { get; }
+
         public AmbientObject(
             int id,
             AmbientObjectKind kind,
             Vector2 position,
             Vector2 size,
             Vector2 velocity,
-            float contactRadius)
+            float contactRadius,
+            float edgePadding = 0f,   // ← 追加。デフォルト0なので既存の呼び出し元は無変更で動く
+            float maxCenterY = 1f)
         {
             Id = id;
             Kind = kind;
@@ -873,6 +878,8 @@ namespace LittlePeopleWorld.Domain
             Size = new Vector2(Mathf.Max(0.001f, size.x), Mathf.Max(0.001f, size.y));
             Velocity = velocity;
             ContactRadius = Mathf.Max(0.001f, contactRadius);
+            EdgePadding = Mathf.Max(0f, edgePadding);   // ← 追加
+            MaxCenterY = Mathf.Clamp01(maxCenterY);   // ← 追加
             State = AmbientObjectState.Idle;
         }
 
@@ -905,7 +912,13 @@ namespace LittlePeopleWorld.Domain
                 return false;
             }
 
-            return Vector2.Distance(Position, person.Position) <= ContactRadius;
+            return IsTouchedBy(person.Position);
+        }
+
+        // 追加: 位置だけで判定する汎用版。LittlePerson以外(深度マスクの粒など)からも使える。
+        public bool IsTouchedBy(Vector2 position)
+        {
+            return Vector2.Distance(Position, position) <= ContactRadius;
         }
 
         public void MarkCloudTouched(float lingerSeconds)
@@ -930,8 +943,14 @@ namespace LittlePeopleWorld.Domain
         void BounceInsideWorld()
         {
             var half = Size * 0.5f;
-            var min = new Vector2(Mathf.Clamp01(half.x), Mathf.Clamp01(half.y));
-            var max = new Vector2(Mathf.Clamp01(1f - half.x), Mathf.Clamp01(1f - half.y));
+            var minX = Mathf.Clamp01(half.x + EdgePadding);
+            var minY = Mathf.Clamp01(half.y + EdgePadding);
+            var maxX = Mathf.Clamp01(1f - half.x - EdgePadding);
+            // 通常の右端/下端の余白と、MaxCenterY(下半分に行かせない制限)の両方のうち、厳しい方を使う
+            var maxY = Mathf.Max(minY, Mathf.Min(Mathf.Clamp01(1f - half.y - EdgePadding), MaxCenterY));
+
+            var min = new Vector2(minX, minY);
+            var max = new Vector2(maxX, maxY);
             var next = Position;
             var nextVelocity = Velocity;
 

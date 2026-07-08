@@ -14,6 +14,9 @@ namespace LittlePeopleWorld.Input
         int nextId = 1;
         int selectedObjectId = -1;
 
+        // --- 何もしないモード(観察モード)。trueの間はマウス入力を一切処理しない ---
+        bool inputEnabled = true;
+
         // --- 自由曲線（連続配置）用に追加した変数 ---
         Vector2 lastDrawPosition;
         bool isDrawingLine = false;
@@ -35,6 +38,9 @@ namespace LittlePeopleWorld.Input
         public IReadOnlyList<InteractionObject> InteractionObjects => interactionObjects;
         public bool DebugEnabled { get; private set; } = false;
         public int SelectedObjectId => selectedObjectId;
+
+        // 現在「何もしないモード」かどうかを外部(UIなど)からも参照できるように公開
+        public bool InputEnabled => inputEnabled;
 
         public void Initialize(MasterDatabase masterDatabase, Camera camera)
         {
@@ -73,14 +79,26 @@ namespace LittlePeopleWorld.Input
             if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha1))
             {
                 currentKind = InteractionObjectKind.Hand;
+                inputEnabled = true;
             }
             else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha2))
             {
                 currentKind = InteractionObjectKind.RoundProp;
+                inputEnabled = true;
             }
             else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha3))
             {
                 currentKind = InteractionObjectKind.BarProp;
+                inputEnabled = true;
+            }
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha4))
+            {
+                // 何もしないモード: クリックしても配置・選択・ドラッグ・削除いずれも発生しない
+                inputEnabled = false;
+
+                // モード切替時に選択状態や描画中フラグが残らないようにクリア
+                isDrawingLine = false;
+                selectedObjectId = -1;
             }
 
             if (UnityEngine.Input.GetKeyDown(KeyCode.D))
@@ -91,6 +109,12 @@ namespace LittlePeopleWorld.Input
 
         void UpdateMouse()
         {
+            if (!inputEnabled)
+            {
+                // 何もしないモードでは、マウス入力を一切処理せずに抜ける
+                return;
+            }
+
             var normalized = GetMouseNormalized();
 
             if (UnityEngine.Input.GetMouseButtonDown(0))
@@ -165,6 +189,12 @@ namespace LittlePeopleWorld.Input
 
         void UpdateEditKeys()
         {
+            if (!inputEnabled)
+            {
+                // 何もしないモードでは回転・削除も無効
+                return;
+            }
+
             var activeIndex = FindObjectIndexById(selectedObjectId);
             if (UnityEngine.Input.GetKeyDown(KeyCode.R) && activeIndex >= 0)
             {

@@ -342,6 +342,7 @@ namespace LittlePeopleWorld.Master
         public Vector2 DefaultSize { get; }
         public float DurationSeconds { get; }
         public string AssetKey { get; }
+        public float DropSizeScale { get; }
 
         public VisualEffectMaster(
             int id,
@@ -353,7 +354,8 @@ namespace LittlePeopleWorld.Master
             float alpha,
             Vector2 defaultSize,
             float durationSeconds,
-            string assetKey)
+            string assetKey,
+            float dropSizeScale = 1f)
         {
             Id = id;
             Kind = kind;
@@ -365,6 +367,7 @@ namespace LittlePeopleWorld.Master
             DefaultSize = new Vector2(Mathf.Max(0.001f, defaultSize.x), Mathf.Max(0.001f, defaultSize.y));
             DurationSeconds = Mathf.Max(0.001f, durationSeconds);
             AssetKey = assetKey ?? string.Empty;
+            DropSizeScale = Mathf.Max(0.05f, dropSizeScale);
         }
     }
 
