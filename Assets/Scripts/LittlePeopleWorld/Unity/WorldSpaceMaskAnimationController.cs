@@ -1360,9 +1360,9 @@ namespace LittlePeopleWorld.Unity
             public void Initialize()
             {
                 stemGlowRenderer = CreateRenderer("StemGlow", RuntimeSpriteFactory.Circle, -3);
-                stemRenderer = CreateRenderer("Stem", RuntimeSpriteFactory.Square, 6);
+                stemRenderer = CreateRenderer("Stem", RuntimeSpriteFactory.Circle, 6);
                 flowerGlowRenderer = CreateRenderer("FlowerGlow", RuntimeSpriteFactory.Circle, 7);
-                flowerRenderer = CreateRenderer("Flower", RuntimeSpriteFactory.Star, 8);
+                flowerRenderer = CreateRenderer("Flower", RuntimeSpriteFactory.Circle, 8);
                 flowerCenterRenderer = CreateRenderer("FlowerCenter", RuntimeSpriteFactory.Circle, 9);
             }
 
