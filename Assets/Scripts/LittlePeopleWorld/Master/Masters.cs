@@ -342,6 +342,7 @@ namespace LittlePeopleWorld.Master
         public Vector2 DefaultSize { get; }
         public float DurationSeconds { get; }
         public string AssetKey { get; }
+        public float DropSizeScale { get; }
 
         public VisualEffectMaster(
             int id,
@@ -353,7 +354,8 @@ namespace LittlePeopleWorld.Master
             float alpha,
             Vector2 defaultSize,
             float durationSeconds,
-            string assetKey)
+            string assetKey,
+            float dropSizeScale = 1f)
         {
             Id = id;
             Kind = kind;
@@ -365,6 +367,7 @@ namespace LittlePeopleWorld.Master
             DefaultSize = new Vector2(Mathf.Max(0.001f, defaultSize.x), Mathf.Max(0.001f, defaultSize.y));
             DurationSeconds = Mathf.Max(0.001f, durationSeconds);
             AssetKey = assetKey ?? string.Empty;
+            DropSizeScale = Mathf.Max(0.05f, dropSizeScale);
         }
     }
 
@@ -569,7 +572,7 @@ namespace LittlePeopleWorld.Master
                 new VisualEffectMaster(1, VisualEffectKind.SoftGlow, VisualEffectRenderMode.Procedural, "soft cyan glow", new Color(0.3f, 0.95f, 1f, 1f), 2.4f, 0.22f, new Vector2(0.1f, 0.1f), 1.0f, string.Empty),
                 new VisualEffectMaster(2, VisualEffectKind.CuriousPulse, VisualEffectRenderMode.Procedural, "curious pink pulse", new Color(1f, 0.35f, 0.9f, 1f), 3.2f, 0.28f, new Vector2(0.1f, 0.1f), 1.0f, string.Empty),
                 new VisualEffectMaster(3, VisualEffectKind.StartleShadow, VisualEffectRenderMode.Procedural, "startle blue shadow", new Color(0.25f, 0.35f, 1f, 1f), 4.2f, 0.25f, new Vector2(0.1f, 0.1f), 1.0f, string.Empty),
-                new VisualEffectMaster(4, VisualEffectKind.RainColumn, VisualEffectRenderMode.Procedural, "cloud rain column", new Color(0.44f, 0.84f, 1f, 1f), 7.5f, 0.72f, new Vector2(0.075f, 0.28f), 0.45f, string.Empty),
+                new VisualEffectMaster(4, VisualEffectKind.RainColumn, VisualEffectRenderMode.Procedural, "cloud rain column", new Color(0.44f, 0.84f, 1f, 1f), 4.0f, 0.72f, new Vector2(0.075f, 0.28f), 0.45f, string.Empty, 0.4f),
                 new VisualEffectMaster(5, VisualEffectKind.StarBurst, VisualEffectRenderMode.Procedural, "star burst", new Color(0.9f, 0.96f, 1f, 1f), 6.2f, 0.86f, new Vector2(0.20f, 0.20f), 0.75f, string.Empty)
             };
 
@@ -581,7 +584,7 @@ namespace LittlePeopleWorld.Master
 
             var tuning = new[]
             {
-                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 0.45f, 1.4f, 1.1f)
+                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 10.0f, 1.4f, 1.1f)
             };
 
             return new MasterDatabase(
