@@ -88,21 +88,6 @@ The cloud contact radius itself is defined in `AmbientObjectTypeMaster`.
 | `plantWiltingStartDelay` | `5` | Delay before wilting after blooming. |
 | `plantWiltingDuration` | `15` | Wilting duration. |
 
-### Bloom Attraction
-
-| Parameter | Default | Meaning |
-|---|---:|---|
-| `bloomAttractRadiusRatio` | `0.5` | Distance from a flower where a particle attaches to the bloom. |
-| `bloomSphereRadiusRatio` | `1.0` | Maximum radius particles may orbit around an attached bloom before detaching. |
-| `bloomAttractForce` | `300` | Pull force toward the flower while attached. |
-| `bloomInfluenceRadiusRatio` | `1.6` | Range where blooming plants can attract particles before mask regions do. |
-| `bloomApproachWeight` | `2.4` | Direction priority toward a blooming plant compared with separation and mask following. |
-| `bloomApproachSpeedMultiplier` | `2.8` | Speed and steering boost while heading toward a blooming plant. |
-| `bloomAttachedSeparationScale` | `0.18` | How much particle separation remains after particles attach to a bloom. Lower values cluster more tightly. |
-| `bloomMaskAttractionScale` | `0.35` | Mask attraction strength while any bloomable plant exists. Lower values make particles prefer flowers. |
-
-Blooming flowers are intentionally stronger than recognition-mask attraction because the main payoff is touching a flower and releasing the gathered particles.
-
 ### Flower Burst
 
 | Parameter | Default | Meaning |

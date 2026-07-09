@@ -91,11 +91,6 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float bloomAttractRadiusRatio = 0.5f;
         [SerializeField] float bloomSphereRadiusRatio = 1.0f;
         [SerializeField] float bloomAttractForce = 300f;
-        [SerializeField] float bloomInfluenceRadiusRatio = 1.6f;
-        [SerializeField] float bloomApproachWeight = 2.4f;
-        [SerializeField] float bloomApproachSpeedMultiplier = 2.8f;
-        [SerializeField, Range(0f, 1f)] float bloomAttachedSeparationScale = 0.18f;
-        [SerializeField, Range(0f, 1f)] float bloomMaskAttractionScale = 0.35f;
 
         // 花のはじけ(A): rain_shape版はペン描画で変化したマスクピクセル数(burstMinChangedPixels)を
         // 閾値にしていたが、mainでは手の輪郭(Hand種別のInteractionObject)がそのまま入力になるため、
@@ -506,22 +501,18 @@ namespace LittlePeopleWorld.Unity
             return minDistance;
         }
 
-        static Vector2 ClosestPointOnSegment(Vector2 point, Vector2 a, Vector2 b)
+        static float DistancePointToSegment(Vector2 point, Vector2 a, Vector2 b)
         {
             var segment = b - a;
             var lengthSquared = segment.sqrMagnitude;
             if (lengthSquared <= 0.000001f)
             {
-                return a;
+                return Vector2.Distance(point, a);
             }
 
             var t = Mathf.Clamp01(Vector2.Dot(point - a, segment) / lengthSquared);
-            return a + segment * t;
-        }
-
-        static float DistancePointToSegment(Vector2 point, Vector2 a, Vector2 b)
-        {
-            return Vector2.Distance(point, ClosestPointOnSegment(point, a, b));
+            var closest = a + segment * t;
+            return Vector2.Distance(point, closest);
         }
 
         // 指定した花に現在吸い付いている粒を、花の中心から放射状に弾き飛ばす。
@@ -707,18 +698,10 @@ namespace LittlePeopleWorld.Unity
             }
 
             Vector2 desiredDirection;
-            var desiredWeight = 1f;
-            var speedBoost = 1f;
             if (plant != null)
             {
                 (desiredDirection, particle.IsClimbing) = ComputePlantApproach(particle, plant);
                 particle.AttachedPlant = plant;
-
-                if (plant.IsBloomable)
-                {
-                    desiredWeight = Mathf.Max(1f, bloomApproachWeight);
-                    speedBoost = Mathf.Max(1f, bloomApproachSpeedMultiplier);
-                }
             }
             else
             {
@@ -736,15 +719,7 @@ namespace LittlePeopleWorld.Unity
                 }
             }
 
-            if (plant == null && HasBloomablePlant())
-            {
-                desiredWeight = Mathf.Clamp01(bloomMaskAttractionScale);
-            }
-
-            var desired = desiredDirection.sqrMagnitude > 0.0001f
-                ? desiredDirection.normalized * desiredWeight
-                : Vector2.zero;
-            var combined = desired + separationForce;
+            var combined = desiredDirection.normalized + separationForce;
             if (combined.sqrMagnitude < 0.0001f)
             {
                 combined = particle.Vel.sqrMagnitude > 0.0001f ? particle.Vel.normalized : UnityEngine.Random.insideUnitCircle;
@@ -753,9 +728,8 @@ namespace LittlePeopleWorld.Unity
         // 登り中は花への向きをより強く・より速く追従させる(plantClimbSpeedMultiplier)
             var climbBoost = particle.IsClimbing ? Mathf.Max(1f, plantClimbSpeedMultiplier) : 1f;
 
-            var finalBoost = Mathf.Max(climbBoost, speedBoost);
-            var desiredVelocity = combined.normalized * speedPxPerSec * particle.SpeedScale * finalBoost;
-            var t = 1f - Mathf.Exp(-steerLerp * finalBoost * dt);
+            var desiredVelocity = combined.normalized * speedPxPerSec * particle.SpeedScale * climbBoost;
+            var t = 1f - Mathf.Exp(-steerLerp * climbBoost * dt);
             particle.Vel = Vector2.Lerp(particle.Vel, desiredVelocity, t);
 
             if (particle.IsClimbing)
@@ -784,7 +758,7 @@ namespace LittlePeopleWorld.Unity
                 ? toCenter.normalized * (bloomAttractForce * dt)
                 : Vector2.zero;
 
-            particle.Vel = pull + separationForce * Mathf.Clamp01(bloomAttachedSeparationScale);
+            particle.Vel = pull + separationForce;
             particle.Pos += particle.Vel * dt;
             ClampParticlePosition(particle);
 
@@ -805,7 +779,7 @@ namespace LittlePeopleWorld.Unity
         PlantModel FindNearestAlivePlantWithinInfluence(Vector2 position)
         {
             PlantModel best = null;
-            var bestScore = float.MaxValue;
+            var bestDistance = float.MaxValue;
 
             foreach (var plant in plants)
             {
@@ -814,60 +788,25 @@ namespace LittlePeopleWorld.Unity
                     continue;
                 }
 
-                var distance = Vector2.Distance(position, plant.Position);
                 var influenceRadius = Mathf.Max(6f, plant.HeightPx * plantInfluenceRadiusRatio);
-                var score = distance;
-
-                if (plant.IsBloomable)
-                {
-                    var distanceToStem = DistancePointToSegment(position, plant.Position, plant.BloomPosition);
-                    var distanceToBloom = Vector2.Distance(position, plant.BloomPosition);
-                    distance = Mathf.Min(distanceToStem, distanceToBloom);
-                    influenceRadius = Mathf.Max(influenceRadius, plant.HeightPx * bloomInfluenceRadiusRatio);
-                    score = distance * 0.65f;
-                }
-
-                if (distance <= influenceRadius && score < bestScore)
+                var distance = Vector2.Distance(position, plant.Position);
+                if (distance <= influenceRadius && distance < bestDistance)
                 {
                     best = plant;
-                    bestScore = score;
+                    bestDistance = distance;
                 }
             }
 
             return best;
         }
 
-        bool HasBloomablePlant()
-        {
-            foreach (var plant in plants)
-            {
-                if (plant.IsBloomable)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         (Vector2 Direction, bool IsClimbing) ComputePlantApproach(Particle particle, PlantModel plant)
         {
+            // 根元(Position)の1点だけでなく、根元→花(BloomPosition)の「茎全体の線分」までの
+            // 最短距離で判定する。こうすることで、判定範囲が根元を中心とした円ではなく、
+            // 茎の先端まで届くカプセル状の領域になる。
             var distanceToStem = DistancePointToSegment(particle.Pos, plant.Position, plant.BloomPosition);
             var climbRadius = Mathf.Max(4f, plant.HeightPx * plantClimbAttractRadiusRatio);
-
-            if (plant.IsBloomable)
-            {
-                var toBloom = plant.BloomPosition - particle.Pos;
-                var bloomAttractRadius = Mathf.Max(4f, plant.HeightPx * bloomAttractRadiusRatio);
-                if (distanceToStem <= climbRadius || toBloom.magnitude <= bloomAttractRadius)
-                {
-                    return (toBloom.sqrMagnitude > 0.0001f ? toBloom.normalized : Vector2.up, true);
-                }
-
-                var closestStem = ClosestPointOnSegment(particle.Pos, plant.Position, plant.BloomPosition);
-                var toStem = closestStem - particle.Pos;
-                return (toStem.sqrMagnitude > 0.0001f ? toStem.normalized : toBloom.normalized, false);
-            }
 
             if (distanceToStem <= climbRadius)
             {
