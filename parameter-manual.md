@@ -8,6 +8,16 @@ Most visual tuning happens in `Assets/Scripts/LittlePeopleWorld/Unity/WorldSpace
 
 Select the GameObject that has `LittlePeopleWorldController`. The controller automatically ensures `WorldSpaceMaskAnimationController` exists when recognition mask animation is enabled.
 
+### Development Rain
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `enableDevelopmentClickRain` | `true` | Right-click in the Game view to spawn a development-only rain column. |
+| `developmentRainDurationSeconds` | `2.0` | How long the clicked rain column remains active. |
+| `developmentRainWidth` | `0.08` | Normalized width of the clicked rain column. |
+
+Clicked rain uses the same `RainColumn` visual effect as cloud rain, so rain visuals, rain audio, and plant growth follow the existing runtime path.
+
 ### Mask
 
 | Parameter | Default | Meaning |

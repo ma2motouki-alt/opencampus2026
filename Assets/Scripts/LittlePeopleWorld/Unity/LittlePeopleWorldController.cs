@@ -27,6 +27,10 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] WorldSpaceMaskAnimationController maskAnimationController;
         [SerializeField] bool enableAudioLayers = true;
         [SerializeField] WorldAudioController audioController;
+        [Header("Development Rain")]
+        [SerializeField] bool enableDevelopmentClickRain = true;
+        [SerializeField] float developmentRainDurationSeconds = 2.0f;
+        [SerializeField] float developmentRainWidth = 0.08f;
 
         readonly List<LittlePersonView> littlePersonViews = new();
         readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
@@ -73,6 +77,7 @@ namespace LittlePeopleWorld.Unity
             var inputProvider = InputProvider;
             orchestrator.AdvanceFrame(Time.deltaTime, inputProvider?.InteractionObjects ?? Array.Empty<InteractionObject>());
             world = orchestrator.World;
+            HandleDevelopmentClickRain();
 
             SyncLittlePeopleViews();
             SyncInteractionObjectViews();
@@ -82,6 +87,33 @@ namespace LittlePeopleWorld.Unity
             SyncVisualEffectViews();
             SyncRecognitionMaskAnimation();
             SyncAudioLayers();
+        }
+
+        void HandleDevelopmentClickRain()
+        {
+            if (!enableDevelopmentClickRain || world == null || masters == null || mapper == null || targetCamera == null)
+            {
+                return;
+            }
+
+            if (!UnityEngine.Input.GetMouseButtonDown(1))
+            {
+                return;
+            }
+
+            var mousePosition = UnityEngine.Input.mousePosition;
+            if (mousePosition.x < 0f || mousePosition.x > Screen.width ||
+                mousePosition.y < 0f || mousePosition.y > Screen.height)
+            {
+                return;
+            }
+
+            var worldPosition = targetCamera.ScreenToWorldPoint(new Vector3(
+                mousePosition.x,
+                mousePosition.y,
+                Mathf.Max(0.001f, -targetCamera.transform.position.z)));
+            var normalizedPosition = mapper.ToNormalized(worldPosition);
+            world.TriggerDevelopmentRain(masters, normalizedPosition, developmentRainWidth, developmentRainDurationSeconds);
         }
 
         void OnGUI()
@@ -97,6 +129,7 @@ namespace LittlePeopleWorld.Unity
                 $"Input: {InputProviderLabel()}\n" +
                 "1 Hand  2 Round  3 Bar\n" +
                 "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
+                "Right click: development rain\n" +
                 $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}";
 
             var style = new GUIStyle(GUI.skin.box)

@@ -1976,6 +1976,7 @@ namespace LittlePeopleWorld.Domain
         readonly List<AmbientObject> ambientObjects = new();
         readonly List<VisualEffectInstance> visualEffects = new();
         int nextVisualEffectId = 1;
+        int nextDevelopmentRainSourceId = -100000;
         float displayAspect = 16f / 9f;
 
         public IReadOnlyList<LittlePerson> LittlePeople => littlePeople;
@@ -2037,6 +2038,26 @@ namespace LittlePeopleWorld.Domain
                 WalkableSurface.AddFromInteractionObject(interactionObject, surfaceMaster, walkableSurfaces, displayAspect);
                 PropObstacle.AddFromInteractionObject(interactionObject, surfaceMaster, propObstacles, displayAspect);
             }
+        }
+
+        public void TriggerDevelopmentRain(MasterDatabase masters, Vector2 position, float width, float durationSeconds)
+        {
+            if (masters == null)
+            {
+                return;
+            }
+
+            var effectMaster = masters.VisualEffects.Get((int)VisualEffectKind.RainColumn);
+            var rainPosition = Clamp01(position);
+            var heightToGround = Mathf.Max(0.05f, 1f - rainPosition.y);
+            var size = new Vector2(Mathf.Max(effectMaster.DefaultSize.x, width), heightToGround);
+            RefreshOrCreateVisualEffect(
+                effectMaster.Id,
+                nextDevelopmentRainSourceId--,
+                rainPosition,
+                size,
+                0f,
+                Mathf.Max(0.05f, durationSeconds));
         }
 
         public bool MarkCloudTouchedByExternalSource(int ambientObjectId, float lingerSeconds)
