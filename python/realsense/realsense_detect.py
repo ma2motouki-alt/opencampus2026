@@ -4,11 +4,15 @@ import argparse
 import time
 
 import cv2
-import numpy as np
 from config import (
     CALIBRATION_PATH,
     CLASSIFIER_MODE,
+    DEBUG_PRINT_OBJECT_SUMMARY,
+    DEBUG_PRINT_SUMMARY_INTERVAL_SECONDS,
     DEBUG_PREVIEW,
+    DEBUG_SHOW_HEIGHT_MAP,
+    DEBUG_SHOW_MASK_STAGES,
+    DEBUG_SHOW_REJECTED_CONTOURS,
     DEFAULT_OBJECT_KIND,
     FLIP_X,
     FLIP_Y,
@@ -18,6 +22,7 @@ from config import (
     UDP_HOST,
     UDP_PORT,
 )
+from debug.debug_visualizer import DebugVisualizer
 from detection.baseline import capture_baseline_depth
 from detection.camera import read_depth_meters, start_realsense_pipeline
 from detection.contour_detector import find_interaction_contours
@@ -48,45 +53,20 @@ def create_mapper(mode: str, calibration_path: str):
     return FrontViewMapper(flip_x=FLIP_X, flip_y=FLIP_Y)
 
 
-def draw_debug_preview(mask, objects: list[dict]) -> None:
-    preview = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
-    image_height, image_width = mask.shape[:2]
-
-    for detected_object in objects:
-        cx = int(detected_object["x"] * (image_width - 1))
-        cy = int(detected_object["y"] * (image_height - 1))
-        cv2.circle(preview, (cx, cy), 8, (0, 255, 255), thickness=2)
-
-        points = detected_object.get("points") or []
-        if len(points) >= 3:
-            polyline = []
-            for point in points:
-                px = int(point["x"] * (image_width - 1))
-                py = int(point["y"] * (image_height - 1))
-                polyline.append([px, py])
-            polyline = np.array(polyline, dtype=np.int32).reshape((-1, 1, 2))
-            cv2.polylines(preview, [polyline], True, (40, 220, 255), 1)
-
-        cv2.putText(
-            preview,
-            f"id:{detected_object['id']} {detected_object['kind']} pts:{len(points)}",
-            (cx + 10, cy),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 255, 255),
-            1,
-            cv2.LINE_AA,
-        )
-
-    cv2.imshow("height mask", preview)
-
-
 def main() -> None:
     args = parse_args()
     pipeline = None
     preview_enabled = DEBUG_PREVIEW and not args.no_preview
     mapper = create_mapper(args.mapper, args.calibration)
     tracker = NearestObjectTracker(max_distance=TRACK_MAX_DISTANCE, ttl_seconds=TRACK_TTL_SECONDS)
+
+    visualizer = DebugVisualizer(
+        show_height_map=DEBUG_SHOW_HEIGHT_MAP,
+        show_mask_stages=DEBUG_SHOW_MASK_STAGES,
+        show_rejected_contours=DEBUG_SHOW_REJECTED_CONTOURS,
+        print_object_summary=DEBUG_PRINT_OBJECT_SUMMARY,
+        print_summary_interval_seconds=DEBUG_PRINT_SUMMARY_INTERVAL_SECONDS,
+    ) if preview_enabled else None
 
     try:
         pipeline, depth_scale = start_realsense_pipeline()
@@ -101,9 +81,15 @@ def main() -> None:
                     print("waiting for RealSense depth frame...", end="\r", flush=True)
                     continue
 
-                mask, height_map = build_height_mask(baseline_depth, current_depth)
+                if preview_enabled:
+                    mask, height_map, mask_debug = build_height_mask(baseline_depth, current_depth, return_debug=True)
+                else:
+                    mask, height_map = build_height_mask(baseline_depth, current_depth)
+                    mask_debug = {}
+
                 image_height, image_width = mask.shape[:2]
-                contours = find_interaction_contours(mask)
+                contour_result = find_interaction_contours(mask, return_debug=preview_enabled)
+                contours, contour_debug = contour_result if preview_enabled else (contour_result, {})
                 raw_objects = extract_hand_shapes(
                     contours,
                     height_map,
@@ -120,7 +106,12 @@ def main() -> None:
                 frame_index += 1
 
                 if preview_enabled:
-                    draw_debug_preview(mask, objects)
+                    visualizer.show(
+                        height_map=height_map,
+                        mask_debug=mask_debug,
+                        contour_debug=contour_debug,
+                        objects=objects,
+                    )
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         break
     except KeyboardInterrupt:
