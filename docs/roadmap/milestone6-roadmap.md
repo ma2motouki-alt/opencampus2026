@@ -1,41 +1,34 @@
-# Milestone 6: Interaction Tuning Pass
+﻿# Milestone 6: Interaction Tuning Pass
 
 ## Goal
 
-展示として気持ちよく見えるように、小人の速度、反応距離、落下軌道、オブジェクトサイズを調整する。
+展示として気持ちよく見えるように、反応距離、速度、雲位置、雨、植物、粒の動きを調整する。
 
 ## Target Scope
 
-- `WorldPresetMaster`
-- `LittlePersonArchetypeMaster`
-- `BehaviorProfileMaster`
-- `InteractionObjectTypeMaster`
-- `WalkableSurfaceMaster`
-- `TuningParameterMaster`
-- debug 表示
+- `Masters.cs`
+- `WorldSpaceMaskAnimationController.cs`
+- Python RealSense `config.py`
+- Unity inspector values
 
-対象外:
+## Current Tuning Focus
 
-- 新機能追加
-- RealSense 入力
-- 本番素材制作
-
-## Work Items
-
-- 小人の数、速度、サイズ、色を調整する。
-- 画面縁歩きの速度と折り返し頻度を調整する。
-- 棒への乗りやすさ、歩行速度、落下クールダウンを調整する。
-- 落下軌道を自然に見える範囲に調整する。
-- オブジェクトサイズとリサイズ範囲を展示向けに調整する。
+- RealSense contour noise reduction.
+- Cloud contact radius and movement band.
+- Particle-to-cloud rain trigger radius.
+- Rain duration and visual size.
+- Plant growth speed and flower attraction.
+- Hand contour reaction padding.
 
 ## Acceptance Check
 
-- 何も置かなくても小人の生活感がある
-- 棒を置いたとき、近くの小人が自然に気づいて乗る
-- 棒に乗る頻度が高すぎず低すぎない
-- 落下が真下ではなく自然な弧に見える
-- 複数オブジェクトを置いても破綻しない
+- 手をかざすと見た目と反応が一致して見える。
+- 小さいノイズがUnity上で過剰に表示されない。
+- 雲が勝手に雨を降らせすぎない。
+- 粒を雲へ動かした時は雨が降る。
+- 雨から植物が自然に育つ。
+- 粒が植物や花へ分かりやすく向かう。
 
 ## Handoff Notes
 
-この milestone は数値調整中心にする。構造変更が必要になった場合は、別 milestone として切り出す。
+調整値を変更したら `parameter-manual.md` も更新する。

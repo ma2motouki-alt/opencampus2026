@@ -1,73 +1,108 @@
-# Domain Object Design
+﻿# Domain Object Design
 
-Domain objects are runtime concepts with state and behavior. Master data is immutable definition data.
+## Core Runtime Objects
 
-## Core Domain Objects
-
-| Domain Object | Responsibility |
+| Object | Responsibility |
 |---|---|
-| `World` | Owns little people, input objects, fields, walkable surfaces, ambient objects, visual effects, and frame advance logic. |
-| `LittlePerson` | Runtime individual with position, velocity, emotion, behavior state, target, and active reaction. |
-| `InteractionObject` | Runtime hand or prop input from mouse or future RealSense. |
-| `InteractionField` | Influence area created by an input object, such as hand repulsion or round-prop curiosity. |
-| `WalkableSurface` | A walkable rule generated from an input object. MVP generates real rectangle-edge paths from a `BarProp`. |
-| `PropObstacle` | A runtime blocking shape derived from an input prop. MVP uses the visible bar rectangle so edge walkers do not pass through a non-walkable side. |
-| `AmbientObject` | World-owned object such as cloud or star. It is separate from input objects. |
-| `ReactionInstance` | Temporary little-person reaction state. |
+| `World` | Owns runtime state and advances the simulation. |
+| `LittlePerson` | Runtime little-person entity. |
+| `LittlePersonBehaviorState` | Current movement and emotional state. |
+| `InteractionObject` | Runtime input object from mouse or UDP RealSense. |
+| `InteractionField` | Reaction field generated from an input object. |
+| `WalkableSurface` | Walkable rule generated from a `BarProp`. |
+| `PropObstacle` | Blocking prop body generated from a `BarProp`. |
+| `AmbientObject` | World-owned cloud or star. |
 | `VisualEffectInstance` | Runtime visual effect such as rain or star burst. |
-| `SensorFrame` | Future RealSense/UDP input frame. |
+| `SensorFrame` | UDP input frame model. |
 
-## Little Person Behavior
+## Interaction Object
 
-- `EdgeWalk`: default state. The little person walks only on the inset rectangular screen edge path.
-- `TransferToSurface`: short transition from the screen edge to a nearby walkable prop surface, or from one prop surface tip to another nearby prop surface.
-- `SurfaceWalk`: walks along a real prop edge using one-dimensional surface progress.
-- `RideSurface`: keeps relative progress on the prop surface while the source prop is being dragged slowly.
-- `Falling`: returns to the nearest edge after surface deletion, exit-point reach with no nearby surface connection, fast prop movement, or connection loss.
+`InteractionObject` stores:
 
-`ClimbBar` remains in the enum for compatibility, but new bar behavior should use `WalkableSurface`.
+- id
+- kind
+- normalized position
+- normalized size
+- angle
+- height
+- state
+- shape kind
+- optional contour points
 
-## Walkable Surface Model
+Contour points are normalized display coordinates. They are clamped to `0.0..1.0`.
 
-- A `WalkableSurface` has `sourceObjectId`, `sourceKind`, `sourceState`, `sourceVelocity`, `start`, `end`, `width`, `sideIndex`, `attachProgress`, `exitProgress`, `attachPoint`, `pathEndPoint`, `exitPoint`, `physicalTipPoint`, and a walkable-side normal.
-- MVP only generates surfaces for `BarProp`.
-- For bar props, `start` and `end` are the two corners of a real long edge of the visible bar rectangle.
-- The surface is the visible rectangle edge itself, not the bar center line and not a separate visual platform outside the bar.
-- Bar rectangle corners are generated with the current display aspect so the domain surface stays parallel to the Unity-rendered bar.
-- Little people attach at `attachPoint`, not at the closest point on the bar.
-- Little people can attach only when they approach from the walkable side of the surface. A little person on the opposite side must not transfer through the prop.
-- The walkable surface should be almost the same length as the visible bar. `attachProgress` may be slightly inset for a natural transfer, but `exitProgress` should normally be `1.0` so the little person reaches the path tip before exiting.
-- `pathEndPoint` is the center-side corner on the walked long edge.
-- `exitPoint` is the same as `pathEndPoint` for Milestone 2.
-- `SurfaceWalk` advances from `attachProgress` to `exitProgress`; reaching `pathEndPoint` starts a short dwell.
-- After the dwell, the little person first searches for a nearby different `WalkableSurface` whose closest point is within `SurfaceConnectionDistance`.
-- A valid surface-to-surface connection must target a different `sourceObjectId`, must be `Placed`, and must pass the target surface's walkable-side check.
-- If a valid nearby surface exists, `TransferToSurface` is reused to move from the current `pathEndPoint` to the closest valid point on the target surface.
-- If no valid nearby surface exists, falling starts from the actual `exitPoint`. Do not clamp the falling start position to the normalized screen bounds, because prop movement or future lane tuning may legitimately place the exit point slightly outside `0.0..1.0`.
-- Bar props that are close to vertical may generate both long edges. Tilted bar props generate only the screen-up long edge as walkable.
-- The debug surface line should overlap the real long edge of the visible bar rectangle. It should not appear as a center line or as a separate light-blue platform outside the bar.
-- Fast source movement causes falling from the current position. Slow dragging keeps the little person riding the same surface progress.
-- Object glow is not part of this model. Debug view may show walkable paths and endpoints.
+## Interaction Field
 
-## Prop Obstacle Model
+`InteractionField.DistanceTo(point)` supports:
 
-- A `PropObstacle` is not a walkable path. It represents the physical area that edge walkers should not pass through.
-- MVP derives an oriented rectangle obstacle from each `BarProp` using the bar center segment as its length and the visible bar width plus padding as its blocking width.
-- The obstacle does not have rounded end caps. Its blocking area stops at the visible bar tips so debug display and collision do not protrude beyond the cyan rectangle.
-- During `EdgeWalk`, if a little person's next edge movement would enter or cross a bar obstacle, the world first tries to start a valid surface transfer.
-- If transfer is not allowed because the little person is on the non-walkable side, the little person reverses `edgeDirection` and backs off slightly instead of walking through the bar.
-- A short per-source cooldown prevents repeated same-frame or next-frame reversals from causing jitter.
+- primitive circle/box fallback,
+- bar distance,
+- contour polygon distance.
 
-## Ambient Reaction Model
+For contour hands, a point inside the contour has distance `0`. A point outside uses the shortest distance to the contour edge. Little people use `HandContourReactionPadding` for contour reaction distance.
 
-- Clouds and stars are `AmbientObject`, not `InteractionObject`.
-- Cloud touch keeps a `RainColumn` visual effect alive.
-- Star touch creates a one-shot `StarBurst` visual effect and enters cooldown.
-- Falling little people do not trigger ambient reactions.
+## Little Person Movement
 
-## Visual Effect Rendering Model
+Current movement states include:
 
-- Domain creates `VisualEffectInstance` with kind, position, size, and lifetime.
-- Unity renderers own visual details such as procedural particles, sprites, prefabs, and animators.
-- MVP uses procedural `RainColumnEffectRenderer` and `StarBurstEffectRenderer`.
-- Future production assets can use `VisualEffectMaster.RenderMode = Prefab` and `AssetKey`.
+- `EdgeWalk`
+- `TransferToSurface`
+- `SurfaceWalk`
+- `RideSurface`
+- `Falling`
+
+Little people usually live on the inset edge path. When a valid bar surface attach point is near enough and approachable from the walkable side, they transfer onto the surface.
+
+## Walkable Surface
+
+Current `BarProp` surfaces are generated from the visible bar rectangle.
+
+- The path lies on the real long edge of the rectangle.
+- The attach side is near the edge-side / far end.
+- The path end is near the center-side tip.
+- A tilted bar exposes only the screen-up side as walkable.
+- A near-vertical bar can expose both sides.
+- If another surface is close to the current tip, the little person transfers directly.
+- If no nearby surface exists, the little person falls back to the display edge.
+
+The debug surface line should overlap the visible bar lane. It is not a separate platform.
+
+## Prop Obstacle
+
+`PropObstacle` prevents edge-walking little people from passing through a non-walkable bar side.
+
+It is an oriented rectangle matching the visible bar body with a small padding. It should not create rounded end caps extending beyond the visible tip.
+
+## Ambient Objects
+
+Clouds and stars are not input objects.
+
+- Cloud touch keeps a `RainColumn` effect alive.
+- Star touch triggers `StarBurst` with cooldown.
+- Clouds have movement constraints so they do not drift through the normal edge-walk route too often.
+
+Clouds can be touched by:
+
+- little people, through domain ambient reaction checks,
+- particles, through `WorldSpaceMaskAnimationController` calling `MarkCloudTouchedByExternalSource`.
+
+## Visual Effects
+
+Visual effects are domain instances rendered by Unity views.
+
+- Rain uses `VisualEffectKind.RainColumn`.
+- Stars use `VisualEffectKind.StarBurst`.
+- Rain can feed the plant system through `WorldSpaceMaskAnimationController`.
+
+## Mask / Particle / Plant Runtime
+
+The particle and plant system is a Unity-side animation layer, not a core domain object.
+
+It reads `World.InteractionObjects` and `World.VisualEffects`, then maintains:
+
+- low-resolution mask buffer,
+- particles,
+- plants,
+- flower burst state.
+
+This layer may use mask-pixel coordinates internally while rendering through Unity world coordinates.

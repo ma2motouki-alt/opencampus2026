@@ -1,9 +1,10 @@
-# System Design
+﻿# System Design
 
-## MVP Runtime
+## Runtime Overview
 
 ```text
-MouseInputProvider
+Mouse / UDP RealSense input
+  -> IInteractionInputProvider
   -> InteractionObject[]
   -> LittlePeopleWorldOrchestrator
     -> ApplyInteractionObjectsUseCase
@@ -15,49 +16,85 @@ MouseInputProvider
     -> LittlePerson[]
     -> AmbientObject[]
     -> VisualEffectInstance[]
-  -> Unity 2D Views
+  -> Unity Views
+    -> InteractionObjectView
+    -> LittlePersonView
+    -> AmbientObjectView
+    -> VisualEffectView
+    -> WorldSpaceMaskAnimationController
 ```
 
-## Future RealSense Runtime
+## Input Modes
+
+### Mouse
+
+Mouse input is used for local development and fallback testing. It creates primitive hand, round, and bar objects.
+
+### UDP RealSense
+
+`UdpRealSenseInputProviderBehaviour` listens on UDP port `5005` by default. Python sends a frame-level JSON object containing current `InteractionObject` values.
+
+The domain model does not know whether input came from mouse or RealSense.
+
+## Python RealSense Runtime
 
 ```text
 RealSense D435
-  -> Python Vision App
+  -> depth frame
+  -> baseline depth subtraction
+  -> height mask
+  -> morphology open/close
+  -> contour extraction
+  -> contour simplification
+  -> optional bar classification
+  -> normalized display mapping
   -> UDP JSON
-  -> UdpRealSenseInputProvider
-  -> InteractionObject[]
-  -> LittlePeopleWorldOrchestrator
-  -> World
-  -> Unity 2D Views
 ```
 
-Unity world logic must not depend on whether an `InteractionObject` came from mouse or RealSense.
+The current practical setup assumes a mostly top-down / front-view camera, so `MAPPER_MODE = "front"` is the default. Homography support remains available for future oblique placement.
 
 ## Derived Runtime Data
 
-`World.SetInteractionObjects` derives runtime objects from the current input list.
+`World.SetInteractionObjects` derives runtime objects from the current input list every frame.
 
-- `InteractionField[]`: influence areas for hand, round prop, and legacy bar data.
-- `WalkableSurface[]`: walkable prop rules. MVP creates paths from the real long edges of each `BarProp` rectangle instead of from the bar center line or separate outside platforms.
-- `PropObstacle[]`: non-walkable prop bodies. MVP creates an oriented rectangle from the visible bar body so edge walkers reverse direction instead of passing through a non-walkable side.
+- `InteractionField[]`: reaction fields for hand, round prop, and primitive fallback.
+- `WalkableSurface[]`: walkable prop rules. Current bar surfaces are generated from the real visible rectangle edge.
+- `PropObstacle[]`: blocking prop bodies so edge walkers turn around instead of passing through a non-walkable side.
 
-These derived objects are rebuilt from input every frame and are not owned by input providers.
+These are not sent over UDP. They are generated inside Unity.
 
-## Coordinate System
+## Coordinates
 
-All input and domain coordinates use normalized display coordinates.
+### Normalized Display Coordinates
 
-- Origin: top-left.
-- X range: `0.0` left to `1.0` right.
-- Y range: `0.0` top to `1.0` bottom.
+Used by Python, UDP, domain objects, ambient objects, and fields.
 
-View code converts normalized coordinates into Unity world coordinates.
+```text
+x: 0.0 left -> 1.0 right
+y: 0.0 top  -> 1.0 bottom
+```
+
+### Unity World Coordinates
+
+Used by views. `NormalizedScreenMapper` converts normalized coordinates to Unity world positions.
+
+### Mask Pixel Coordinates
+
+Used internally by `WorldSpaceMaskAnimationController`.
+
+Default mask size:
+
+```text
+256 x 144
+```
+
+Particles and plants are simulated mainly in this mask-pixel coordinate space, then rendered through `MaskToWorld()`.
 
 ## Application Layer
 
-- `CreateWorldUseCase`: creates a runtime `World` from `MasterDatabase` and world preset id.
-- `ApplyInteractionObjectsUseCase`: applies input objects and lets `World` rebuild fields and walkable surfaces.
-- `AdvanceWorldUseCase`: advances domain simulation for one frame.
-- `LittlePeopleWorldOrchestrator`: calls the use cases in frame order.
+- `CreateWorldUseCase`: creates a runtime `World`.
+- `ApplyInteractionObjectsUseCase`: applies current input and rebuilds derived runtime data.
+- `AdvanceWorldUseCase`: advances simulation for one frame.
+- `LittlePeopleWorldOrchestrator`: coordinates the use cases.
 
 Unity controllers own camera setup, GameObject creation, and view synchronization. Domain objects own behavior rules such as edge walking, prop blocking, surface walking, riding, falling, and ambient reactions.

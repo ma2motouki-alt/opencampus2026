@@ -1,42 +1,42 @@
-# Milestone 8: RealSense Prototype
+﻿# Milestone 8: RealSense Prototype
 
 ## Goal
 
-RealSense D435 と Python 認識アプリから、Unity に物体座標を送れる状態にする。
+RealSense D435 と Python 認識アプリから、手や物体の輪郭をUnityへ送る。
 
 ## Target Scope
 
-- Python vision app
-- RealSense D435
-- `pyrealsense2`
-- OpenCV
-- depth threshold
-- contour detection
-- plane calibration
+- RealSense D435 depth stream
+- Baseline depth capture
+- Height mask
+- OpenCV contour extraction
+- Contour simplification
+- Auto classification for slender bar-like objects
+- Front-view coordinate mapping
+- Optional homography mapping
 - UDP JSON send
+- Debug preview
 
-対象外:
+## Current Implementation
 
-- 高精度な自由物体分類
-- 展示本番の固定リグ最適化
-- Unity 側 domain logic の変更
-
-## Work Items
-
-- RealSense D435 から depth frame を取得する。
-- 平面キャリブレーションでディスプレイ面を推定する。
-- 深度しきい値で手やプロップ候補を抽出する。
-- 輪郭抽出で位置、サイズ、角度を推定する。
-- 専用プロップの丸・棒・ブロック相当を `InteractionObject` JSON に変換する。
-- UDP で Unity に送信する。
+- `python/realsense/realsense_detect.py` is the entry point.
+- `MAPPER_MODE = "front"` is the default.
+- `CLASSIFIER_MODE = "auto"` sends slender contours as `bar_prop`.
+- Hand-like regions are sent as `kind=hand`, `shape=contour`.
+- Contour points are simplified with `cv2.approxPolyDP`.
+- Tiny and huge contours are filtered by area.
+- Debug windows show height map, mask stages, accepted/rejected contours, and sent objects.
 
 ## Acceptance Check
 
-- RealSense から取得した物体が Unity 上に表示される
-- 棒プロップが `bar_prop` として Unity に届く
-- 物体を動かすと Unity 側の位置も追従する
-- マウス入力と同じ domain logic で小人が反応する
+- RealSense depth frames are acquired.
+- Empty-screen baseline is captured.
+- A hand appears in debug preview as a valid contour.
+- Unity receives `hand` contour objects.
+- Slender objects can be classified as `bar_prop`.
+- Noise blobs below the area threshold are rejected.
+- Unity display follows the detected contour position.
 
 ## Handoff Notes
 
-最初は専用プロップ前提でよい。自由分類よりも、安定して normalized coordinate を送れることを優先する。
+The current exhibition plan uses mostly top-down / front-view placement. Homography remains available but is not the default path.

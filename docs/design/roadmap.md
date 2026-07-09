@@ -1,8 +1,14 @@
-# Roadmap
+﻿# Roadmap Pointer
 
-実装を進めるためのロードマップは、参照しやすいように milestone ごとのファイルへ分割して `docs/roadmap` に置く。
+The active roadmap is split by milestone under:
 
-- 全体入口: [../roadmap/README.md](../roadmap/README.md)
-- 次に着手する作業: [../roadmap/milestone1-roadmap.md](../roadmap/milestone1-roadmap.md)
+```text
+docs/roadmap/
+```
 
-`docs/design` は安定した設計仕様を置く場所とし、`docs/roadmap` は実装を繰り返しながら完成度を上げるための作業計画を置く場所とする。
+Start with:
+
+- `docs/roadmap/README.md`
+- `docs/roadmap/milestone-pending.md`
+
+This file exists only for backward compatibility with older prompts that referenced `docs/design/roadmap.md`.

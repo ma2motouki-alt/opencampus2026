@@ -1,8 +1,8 @@
-# Milestone 5: Visual Replacement Layer
+﻿# Milestone 5: Visual Replacement Layer
 
 ## Goal
 
-仮の丸い小人や procedural effect を、将来の絵素材・アニメーションへ差し替え可能にする。
+仮表示と手続き的な演出を、後から素材・アニメーションに差し替えやすい構造にする。
 
 ## Target Scope
 
@@ -10,29 +10,24 @@
 - `InteractionObjectView`
 - `AmbientObjectView`
 - `VisualEffectView`
-- `VisualEffectMaster`
+- `WorldSpaceMaskAnimationController`
+- `RuntimeSpriteFactory`
 
-対象外:
+## Current Implementation
 
-- 実際の本番アニメーション素材制作
-- FMOD 導入
-- UI 追加
-
-## Work Items
-
-- `LittlePersonView` を状態別表示に整理する。
-- 状態名を `EdgeWalk`, `TransferToSurface`, `SurfaceWalk`, `RideSurface`, `Falling`, `Calm`, `Curious`, `Startled` として扱えるようにする。
-- 将来 Animator / SpriteAnimation に差し替えるための状態名を design docs に定義する。
-- `VisualEffectView` を `VisualEffectMaster.RenderMode` に沿って分岐できる構造にする。
-- MVP の procedural 表示は維持する。
+- Little people use procedural sprite-like renderers.
+- Interaction contour fill uses generated mesh.
+- Rain uses procedural teardrop-like sprites.
+- Plants and flowers are generated at runtime.
+- Flower burst and particle effects are procedural.
 
 ## Acceptance Check
 
-- 小人の状態に応じて見た目が変わる
-- 本番アニメーション素材を追加するとき、domain object を変更せずに済む
-- 雨・星バーストを prefab 化する道筋がある
-- procedural 表示だけでも MVP として動作する
+- Contour fill and outline can be styled without changing domain logic.
+- Rain and star effects remain behind `VisualEffectMaster`.
+- Plant rendering can be tuned in `WorldSpaceMaskAnimationController`.
+- Future sprite/Animator replacement can happen in views.
 
 ## Handoff Notes
 
-素材差し替え境界を作る milestone であり、見た目を豪華にする milestone ではない。domain には描画都合を入れない。
+Do not put asset-specific rules into `DomainModels.cs`. Keep replacement boundaries in Unity view classes.

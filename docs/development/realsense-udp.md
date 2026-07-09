@@ -1,26 +1,27 @@
-# RealSense UDP Input
+﻿# RealSense UDP Input
+
+## Overview
 
 RealSense input is split into two parts:
 
-- Python detects props and sends normalized UDP JSON.
-- Unity receives UDP JSON through `UdpRealSenseInputProviderBehaviour` and exposes `InteractionObject` values to the existing world logic.
+- Python detects depth contours and sends normalized UDP JSON.
+- Unity receives UDP JSON through `UdpRealSenseInputProviderBehaviour`.
 
 The world domain does not know whether the input came from mouse or RealSense.
 
 ## Unity Setup
 
-1. Open the Unity project with `6000.4.10f1`.
-2. Select the GameObject that has `LittlePeopleWorldController`.
-3. Set `Input Provider Mode` to `Udp Real Sense`.
-4. Keep the UDP provider port at `5005` unless Python is configured differently.
-5. Press Play.
-6. Press `D` to show debug overlays.
+1. Open the project with Unity `6000.4.10f1`.
+2. Open `Assets/Scenes/LittlePeopleWorldMvp.unity`.
+3. Select the GameObject with `LittlePeopleWorldController`.
+4. Set `Input Provider Mode` to `Udp Real Sense`.
+5. Keep UDP port `5005` unless Python is configured differently.
+6. Press Play.
+7. Press `D` to toggle Unity debug overlays.
 
-If no UDP packet arrives for about one second, Unity clears the input objects.
+If no UDP packet arrives for about one second, Unity clears input objects.
 
 ## Python Setup
-
-Create a Python environment and install dependencies:
 
 ```powershell
 cd python/realsense
@@ -29,10 +30,10 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Run a dummy UDP sender without RealSense:
+Run a dummy UDP sender:
 
 ```powershell
-python test_sender.py --kind bar_prop
+python test_sender.py --kind hand
 ```
 
 Run RealSense detection:
@@ -41,9 +42,17 @@ Run RealSense detection:
 python realsense_detect.py
 ```
 
-## JSON Contract
+Useful options:
 
-Python sends one frame message:
+```powershell
+python realsense_detect.py --no-preview
+python realsense_detect.py --kind hand
+python realsense_detect.py --classifier-mode auto
+python realsense_detect.py --mapper front
+python realsense_detect.py --mapper homography --calibration calibration.json
+```
+
+## JSON Contract
 
 ```json
 {
@@ -52,14 +61,20 @@ Python sends one frame message:
   "objects": [
     {
       "id": 7,
-      "kind": "bar_prop",
-      "x": 0.36,
-      "y": 0.74,
-      "w": 0.18,
-      "h": 0.04,
-      "angle": -24,
-      "height": 0.05,
-      "state": "placed"
+      "kind": "hand",
+      "shape": "contour",
+      "x": 0.42,
+      "y": 0.58,
+      "w": 0.22,
+      "h": 0.18,
+      "angle": 0,
+      "height": 0.06,
+      "state": "placed",
+      "points": [
+        { "x": 0.38, "y": 0.51 },
+        { "x": 0.44, "y": 0.49 },
+        { "x": 0.50, "y": 0.54 }
+      ]
     }
   ]
 }
@@ -67,31 +82,46 @@ Python sends one frame message:
 
 Coordinate rules:
 
-- `x`, `y`, `w`, and `h` are normalized `0.0..1.0`.
-- Origin is the top-left of the display.
+- `x`, `y`, `w`, `h`, and `points` are normalized `0.0..1.0`.
+- Origin is top-left.
 - `x` increases right.
 - `y` increases down.
-- `angle` uses the same convention as the mouse bar input: `atan2(dy, dx)` in degrees.
+- `angle` is degrees and mainly used for primitive bar fallback.
 
-## RealSense Detection Strategy
+## Detection Strategy
 
-The hand contour MVP uses:
+Current MVP uses:
 
 - RealSense D435 depth stream.
-- Baseline depth capture with no object on the display.
-- Height mask from `baseline_depth - current_depth`.
-- OpenCV contour extraction.
-- `cv2.approxPolyDP` for simplified hand contour points.
-- A front-view mapper for the first MVP.
-- A homography mapper for later oblique camera placement.
-- A small nearest-neighbor tracker for stable object ids.
+- Baseline depth capture with empty display.
+- `baseline_depth - current_depth`.
+- Height threshold.
+- Morphological open/close.
+- `cv2.findContours`.
+- Area filtering.
+- `cv2.approxPolyDP`.
+- Optional slender-object classification.
+- Nearest-neighbor tracking.
+- UDP JSON send.
 
-The first target is a hand sent as `kind=hand`, `shape=contour`.
-The existing primitive contract remains valid for `bar_prop`, `round_prop`, and fallback hand rendering.
+## Debugging Noise
 
-Hand contour packets add:
+Python debug windows show:
 
-- `shape: "contour"`
-- `points: [{ "x": 0.0..1.0, "y": 0.0..1.0 }]`
+- height map,
+- mask before morphology,
+- mask after open,
+- mask after close,
+- accepted / rejected contours,
+- sent objects.
 
-Unity renders contour hands with a `LineRenderer` and keeps the existing hand field for stable little-person reactions.
+Use these windows to determine whether noise comes from:
+
+- depth reflection,
+- too low height threshold,
+- too small min area,
+- morphology kernel too small,
+- unstable baseline,
+- camera placement or display reflection.
+
+Main tuning values are in `python/realsense/config.py`.

@@ -1,68 +1,97 @@
-# Git Workflow
+﻿# Git Workflow
 
-This repository uses a small pull request workflow for two-person development.
+## Basic Policy
 
-## Branch Policy
+- `main` should stay runnable.
+- Work on feature branches.
+- Use one pull request per purpose.
+- Commit Unity `.meta` files with their assets.
+- Do not commit `Library/`, `Temp/`, `Logs/`, or local Unity cache files.
+- Avoid editing the same Unity Scene or Prefab at the same time without talking to the team.
 
-- `main` should stay playable.
-- Do not work directly on `main`.
-- Create one `feature/...` branch per task.
-- Keep each pull request focused on one purpose.
-- Commit Unity `.meta` files with the assets or scripts they belong to.
-- Do not commit `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `work/`, or `outputs/`.
-
-Recommended branches:
-
-- `feature/realsense-udp-input` for RealSense / UDP input work.
-- `feature/world-behavior-*` for little-people behavior changes.
-- `feature/visual-*` for visual or animation changes.
-
-## Daily Flow
-
-Start from the latest `main`:
+## Daily Start
 
 ```powershell
 git switch main
 git pull
-git switch -c feature/realsense-udp-input
+git switch -c feature/your-work-name
 ```
 
-Work normally in Unity or Python, then check the diff:
+If the branch already exists:
+
+```powershell
+git fetch
+git switch feature/your-work-name
+git pull
+```
+
+## Check Current State
+
+```powershell
+git branch --show-current
+git status
+```
+
+In VS Code, the current branch name is also shown in the lower-left status bar and in the Source Control graph.
+
+## Commit
 
 ```powershell
 git status
-git diff
+git add .
+git commit -m "Describe the change"
 ```
 
-Commit your work:
+Before committing, check that only intended files are staged.
+
+## Push
+
+First push of a branch:
 
 ```powershell
-git add .
-git commit -m "Add UDP input provider"
-git push -u origin feature/realsense-udp-input
+git push -u origin feature/your-work-name
 ```
 
-Open a Pull Request on GitHub, ask the other developer to review it, then merge it into `main`.
+Later pushes:
 
-After a PR is merged, both developers update their local copy:
+```powershell
+git push
+```
+
+## Pull Request
+
+1. Push your feature branch.
+2. Open GitHub.
+3. Create a Pull Request into `main`.
+4. Ask another team member to review when possible.
+5. Merge only after checking Unity still opens and the relevant feature works.
+
+## After Merge
 
 ```powershell
 git switch main
 git pull
 ```
 
-## Pull Request Checklist
+Delete old feature branches when they are no longer needed.
 
-Before opening a PR:
+## Clone On Another PC
 
-- Unity opens with the expected editor version.
-- Play Mode still works with mouse input.
-- New scripts have their `.meta` files.
-- The PR does not contain generated Unity folders.
-- The PR has a short explanation of what changed and how it was tested.
+For the stable current version:
 
-## Conflict Notes
+```powershell
+git clone https://github.com/ma2motouki-alt/opencampus2026.git
+```
 
-Unity scenes and prefabs can be hard to merge. If both developers need to edit the same scene or prefab, decide who owns that file for the task before starting.
+For a feature branch:
 
-Code and docs are usually easier to merge, but still keep PRs small.
+```powershell
+git clone -b feature/branch-name https://github.com/ma2motouki-alt/opencampus2026.git
+```
+
+## Unity Notes
+
+- Open the cloned folder with Unity Hub.
+- Use Unity `6000.4.10f1`.
+- Keep `.meta` files.
+- If Unity regenerates many unrelated files, inspect carefully before committing.

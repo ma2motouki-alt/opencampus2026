@@ -36,6 +36,15 @@ namespace LittlePeopleWorld.Unity
             new(1.00f, 1.00f, 1.00f)
         };
 
+        [Header("Particle Fairy Wings")]
+        [SerializeField] bool showParticleWings = true;
+        [SerializeField] float particleWingSideOffsetRatio = 0.44f;
+        [SerializeField] float particleWingBackOffsetRatio = -0.08f;
+        [SerializeField] float particleWingWidthRatio = 0.42f;
+        [SerializeField] float particleWingLengthRatio = 2f;
+        [SerializeField] float particleWingAlpha = 0.52f;
+        [SerializeField] float particleWingFlapSpeed = 14f;
+
         [Header("Particle Separation")]
         [SerializeField] float separationRadiusPx = 8f;
         [SerializeField] float separationGain = 380f;
@@ -276,6 +285,8 @@ namespace LittlePeopleWorld.Unity
             root.SetParent(particleRoot, false);
 
             var glow = CreateRenderer(root, "Glow", RuntimeSpriteFactory.Circle, -4);
+            var leftWing = CreateRenderer(root, "Left Wing", RuntimeSpriteFactory.Circle, 9);
+            var rightWing = CreateRenderer(root, "Right Wing", RuntimeSpriteFactory.Circle, 9);
             var body = CreateRenderer(root, "Body", RuntimeSpriteFactory.Circle, 10);
             var head = CreateRenderer(root, "Head", RuntimeSpriteFactory.Circle, 11);
             head.transform.localPosition = new Vector3(particleSize * 0.12f, particleSize * 0.16f, 0f);
@@ -288,6 +299,10 @@ namespace LittlePeopleWorld.Unity
             head.transform.localScale = Vector3.one * particleSize * 0.58f;
             body.color = color;
             head.color = Color.Lerp(color, Color.white, 0.35f);
+            var wingColor = Color.Lerp(color, Color.white, 0.7f);
+            wingColor.a = particleWingAlpha;
+            leftWing.color = wingColor;
+            rightWing.color = wingColor;
 
             return new Particle
             {
@@ -299,6 +314,8 @@ namespace LittlePeopleWorld.Unity
                 BodyColor = color,
                 Root = root,
                 GlowRenderer = glow,
+                LeftWingRenderer = leftWing,
+                RightWingRenderer = rightWing,
                 BodyRenderer = body,
                 HeadRenderer = head
             };
@@ -546,6 +563,41 @@ namespace LittlePeopleWorld.Unity
             glowColor.a = pulse * 0.4f;
             particle.GlowRenderer.color = glowColor;
             particle.GlowRenderer.transform.localScale = Vector3.one * particleSize * (2.0f + pulse * 0.6f);
+
+            RenderParticleWings(particle, index);
+        }
+
+        void RenderParticleWings(Particle particle, int index)
+        {
+            if (particle.LeftWingRenderer == null || particle.RightWingRenderer == null)
+            {
+                return;
+            }
+
+            particle.LeftWingRenderer.enabled = showParticleWings;
+            particle.RightWingRenderer.enabled = showParticleWings;
+            if (!showParticleWings)
+            {
+                return;
+            }
+
+            var wingSideOffset = particleSize * particleWingSideOffsetRatio;
+            var wingBackOffset = particleSize * particleWingBackOffsetRatio;
+            var flap = 0.5f + 0.5f * Mathf.Sin(Time.time * particleWingFlapSpeed + index * 0.83f);
+            var wingWidth = particleSize * particleWingWidthRatio * Mathf.Lerp(0.8f, 1.08f, flap);
+            var wingLength = particleSize * particleWingLengthRatio * Mathf.Lerp(1.08f, 0.86f, flap);
+            var wingTilt = Mathf.Lerp(18f, 42f, flap);
+            var wingColor = Color.Lerp(particle.BodyColor, Color.white, 0.78f);
+            wingColor.a = particleWingAlpha * Mathf.Lerp(0.72f, 1f, flap);
+
+            particle.LeftWingRenderer.color = wingColor;
+            particle.RightWingRenderer.color = wingColor;
+            particle.LeftWingRenderer.transform.localPosition = new Vector3(wingBackOffset, wingSideOffset, 0f);
+            particle.RightWingRenderer.transform.localPosition = new Vector3(wingBackOffset, -wingSideOffset, 0f);
+            particle.LeftWingRenderer.transform.localScale = new Vector3(wingWidth, wingLength, 1f);
+            particle.RightWingRenderer.transform.localScale = new Vector3(wingWidth, wingLength, 1f);
+            particle.LeftWingRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, wingTilt);
+            particle.RightWingRenderer.transform.localRotation = Quaternion.Euler(0f, 0f, -wingTilt);
         }
 
         void UpdateJitter(Particle particle, float dt)
@@ -1347,6 +1399,8 @@ namespace LittlePeopleWorld.Unity
             public Color BodyColor;
             public Transform Root;
             public SpriteRenderer GlowRenderer;
+            public SpriteRenderer LeftWingRenderer;
+            public SpriteRenderer RightWingRenderer;
             public SpriteRenderer BodyRenderer;
             public SpriteRenderer HeadRenderer;
             public bool IsClimbing;
