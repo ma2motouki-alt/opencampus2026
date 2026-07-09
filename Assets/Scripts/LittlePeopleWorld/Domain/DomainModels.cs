@@ -2039,6 +2039,20 @@ namespace LittlePeopleWorld.Domain
             }
         }
 
+        public bool MarkCloudTouchedByExternalSource(int ambientObjectId, float lingerSeconds)
+        {
+            foreach (var ambientObject in ambientObjects)
+            {
+                if (ambientObject.Id == ambientObjectId && ambientObject.Kind == AmbientObjectKind.Cloud)
+                {
+                    ambientObject.MarkCloudTouched(lingerSeconds);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public void Advance(float deltaTime, MasterDatabase masters)
         {
             var tuning = masters.TuningParameters.Get(1);
@@ -2070,7 +2084,9 @@ namespace LittlePeopleWorld.Domain
                     AmbientSpawnPosition(AmbientObjectKind.Cloud, i),
                     cloudType.DefaultSize,
                     AmbientVelocity(cloudType.DriftVelocity, i),
-                    cloudType.ContactRadius));
+                    cloudType.ContactRadius,
+                    cloudType.MovementEdgePadding,
+                    cloudType.MaxCenterY));
             }
 
             var starType = masters.GetAmbientObjectType(AmbientObjectKind.Star);
@@ -2082,7 +2098,9 @@ namespace LittlePeopleWorld.Domain
                     AmbientSpawnPosition(AmbientObjectKind.Star, i),
                     starType.DefaultSize,
                     AmbientVelocity(starType.DriftVelocity, i),
-                    starType.ContactRadius));
+                    starType.ContactRadius,
+                    starType.MovementEdgePadding,
+                    starType.MaxCenterY));
             }
         }
 
@@ -2210,11 +2228,11 @@ namespace LittlePeopleWorld.Domain
                 switch (index % 3)
                 {
                     case 0:
-                        return new Vector2(0.24f, 0.09f);
+                        return new Vector2(0.30f, 0.24f);
                     case 1:
-                        return new Vector2(0.72f, 0.16f);
+                        return new Vector2(0.70f, 0.31f);
                     default:
-                        return new Vector2(0.44f, 0.86f);
+                        return new Vector2(0.50f, 0.27f);
                 }
             }
 

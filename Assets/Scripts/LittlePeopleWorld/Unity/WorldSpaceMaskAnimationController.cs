@@ -54,6 +54,11 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float edgeMarginPx = 7f;
         [SerializeField] float edgePullGain = 0.12f;
 
+        [Header("Particle Cloud Rain")]
+        [SerializeField] bool enableParticleCloudRain = true;
+        [SerializeField] float particleCloudTouchRadius = 0.01f;
+        [SerializeField] float particleCloudRainCooldownSeconds = 0.2f;
+
         [Header("Rain To Plants")]
         [SerializeField] bool enableRainPlants = true;
         [SerializeField] float rainFallSpeedPxPerSec = 40f;
@@ -93,6 +98,7 @@ namespace LittlePeopleWorld.Unity
         readonly Dictionary<int, PlantViewRuntime> plantViews = new();
         readonly Dictionary<int, float> rainActiveSeconds = new();
         readonly Dictionary<int, int> rainLandedCounts = new();
+        readonly Dictionary<int, float> particleCloudRainCooldowns = new();
         readonly List<int> floodStack = new();
         readonly List<int> componentBuffer = new();
 
@@ -139,6 +145,7 @@ namespace LittlePeopleWorld.Unity
             HandleFlowerBurst(world.InteractionObjects);
 
             AdvanceParticles(dt);
+            TriggerCloudRainFromParticles(world, masters, dt);
             AdvanceRainPlants(world, masters, dt);
             SetVisible(true);
         }
@@ -865,6 +872,93 @@ namespace LittlePeopleWorld.Unity
             }
 
             return target + particle.Jitter - position;
+        }
+
+        void TriggerCloudRainFromParticles(World world, MasterDatabase masters, float dt)
+        {
+            AdvanceParticleCloudRainCooldowns(dt);
+            if (!enableParticleCloudRain || particles.Count == 0)
+            {
+                return;
+            }
+
+            var tuning = masters.TuningParameters.Get(1);
+            var touchedCloudIds = new HashSet<int>();
+            var touchRadiusPadding = Mathf.Max(0f, particleCloudTouchRadius);
+
+            foreach (var ambientObject in world.AmbientObjects)
+            {
+                if (ambientObject.Kind != AmbientObjectKind.Cloud)
+                {
+                    continue;
+                }
+
+                touchedCloudIds.Add(ambientObject.Id);
+                if (particleCloudRainCooldowns.TryGetValue(ambientObject.Id, out var cooldown) &&
+                    cooldown > 0f)
+                {
+                    continue;
+                }
+
+                if (!IsCloudTouchedByAnyParticle(ambientObject, touchRadiusPadding))
+                {
+                    continue;
+                }
+
+                if (world.MarkCloudTouchedByExternalSource(ambientObject.Id, tuning.RainLingerSeconds))
+                {
+                    particleCloudRainCooldowns[ambientObject.Id] = Mathf.Max(0.01f, particleCloudRainCooldownSeconds);
+                }
+            }
+
+            RemoveDeadParticleCloudCooldowns(touchedCloudIds);
+        }
+
+        void AdvanceParticleCloudRainCooldowns(float dt)
+        {
+            if (particleCloudRainCooldowns.Count == 0)
+            {
+                return;
+            }
+
+            var keys = new List<int>(particleCloudRainCooldowns.Keys);
+            foreach (var key in keys)
+            {
+                particleCloudRainCooldowns[key] = Mathf.Max(0f, particleCloudRainCooldowns[key] - dt);
+            }
+        }
+
+        void RemoveDeadParticleCloudCooldowns(HashSet<int> liveCloudIds)
+        {
+            var dead = new List<int>();
+            foreach (var key in particleCloudRainCooldowns.Keys)
+            {
+                if (!liveCloudIds.Contains(key))
+                {
+                    dead.Add(key);
+                }
+            }
+
+            foreach (var key in dead)
+            {
+                particleCloudRainCooldowns.Remove(key);
+            }
+        }
+
+        bool IsCloudTouchedByAnyParticle(AmbientObject cloud, float touchRadiusPadding)
+        {
+            var touchRadius = cloud.ContactRadius + touchRadiusPadding;
+            var touchRadiusSqr = touchRadius * touchRadius;
+            foreach (var particle in particles)
+            {
+                var particlePosition = MaskPxToNormalized(particle.Pos);
+                if ((particlePosition - cloud.Position).sqrMagnitude <= touchRadiusSqr)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         void AdvanceRainPlants(World world, MasterDatabase masters, float dt)
