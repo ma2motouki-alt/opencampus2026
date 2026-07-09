@@ -308,6 +308,8 @@ namespace LittlePeopleWorld.Master
         public float ContactRadius { get; }
         public Color Color { get; }
         public int VisualEffectMasterId { get; }
+        public float MovementEdgePadding { get; }
+        public float MaxCenterY { get; }
 
         public AmbientObjectTypeMaster(
             int id,
@@ -317,7 +319,9 @@ namespace LittlePeopleWorld.Master
             Vector2 driftVelocity,
             float contactRadius,
             Color color,
-            int visualEffectMasterId)
+            int visualEffectMasterId,
+            float movementEdgePadding = 0f,
+            float maxCenterY = 1f)
         {
             Id = id;
             Kind = kind;
@@ -327,6 +331,8 @@ namespace LittlePeopleWorld.Master
             ContactRadius = Mathf.Max(0.001f, contactRadius);
             Color = color;
             VisualEffectMasterId = visualEffectMasterId;
+            MovementEdgePadding = Mathf.Max(0f, movementEdgePadding);
+            MaxCenterY = Mathf.Clamp01(maxCenterY);
         }
     }
 
@@ -563,7 +569,7 @@ namespace LittlePeopleWorld.Master
 
             var ambientObjectTypes = new[]
             {
-                new AmbientObjectTypeMaster(1, AmbientObjectKind.Cloud, "drifting cloud", new Vector2(0.095f, 0.05f), new Vector2(0.014f, 0.003f), 0.105f, new Color(0.86f, 0.95f, 1f, 0.78f), 4),
+                new AmbientObjectTypeMaster(1, AmbientObjectKind.Cloud, "drifting cloud", new Vector2(0.095f, 0.05f), new Vector2(0.014f, 0.003f), 0.075f, new Color(0.86f, 0.95f, 1f, 0.78f), 4, 0.18f, 0.38f),
                 new AmbientObjectTypeMaster(2, AmbientObjectKind.Star, "spark star", new Vector2(0.06f, 0.06f), new Vector2(0.01f, 0.006f), 0.085f, new Color(1f, 0.94f, 0.36f, 0.9f), 5)
             };
 
@@ -584,7 +590,7 @@ namespace LittlePeopleWorld.Master
 
             var tuning = new[]
             {
-                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 10.0f, 1.4f, 1.1f)
+                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 5.0f, 1.4f, 1.1f)
             };
 
             return new MasterDatabase(
