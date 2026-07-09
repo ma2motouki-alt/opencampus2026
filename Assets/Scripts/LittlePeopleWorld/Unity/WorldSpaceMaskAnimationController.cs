@@ -87,6 +87,16 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float plantWiltingStartDelay = 5f;
         [SerializeField] float plantWiltingDuration = 15f;
 
+        [Header("Plant Leaves")]
+        [SerializeField] int plantLeafCount = 4;
+        [SerializeField] float plantLeafLengthPx = 10f;
+        [SerializeField] float plantLeafWidthPx = 4.5f;
+        [SerializeField] float plantLeafStartRatio = 0.24f;
+        [SerializeField] float plantLeafEndRatio = 0.72f;
+        [SerializeField] float plantLeafAngleDegrees = 42f;
+        [SerializeField, Range(0f, 1f)] float plantLeafAlpha = 0.82f;
+        [SerializeField, Range(0f, 1f)] float plantLeafVeinAlpha = 0.62f;
+
         [Header("Bloom Attraction")]
         [SerializeField] float bloomAttractRadiusRatio = 0.5f;
         [SerializeField] float bloomSphereRadiusRatio = 1.0f;
@@ -1200,7 +1210,15 @@ namespace LittlePeopleWorld.Unity
                     bloomWorldPosition,
                     worldUnitsPerMaskPx,
                     plantStemWidthPx,
-                    plantFlowerSizePx);
+                    plantFlowerSizePx,
+                    plantLeafCount,
+                    plantLeafLengthPx,
+                    plantLeafWidthPx,
+                    plantLeafStartRatio,
+                    plantLeafEndRatio,
+                    plantLeafAngleDegrees,
+                    plantLeafAlpha,
+                    plantLeafVeinAlpha);
             }
 
             var deadIds = new List<int>();
@@ -1547,6 +1565,8 @@ namespace LittlePeopleWorld.Unity
         {
             SpriteRenderer stemGlowRenderer;
             SpriteRenderer stemRenderer;
+            readonly List<SpriteRenderer> leafRenderers = new();
+            readonly List<SpriteRenderer> leafVeinRenderers = new();
             SpriteRenderer flowerGlowRenderer;
             SpriteRenderer flowerRenderer;
             SpriteRenderer flowerCenterRenderer;
@@ -1566,7 +1586,15 @@ namespace LittlePeopleWorld.Unity
                 Vector3 bloomWorldPosition,
                 float worldUnitsPerMaskPx,
                 float stemWidthPx,
-                float flowerSizePx)
+                float flowerSizePx,
+                int leafCount,
+                float leafLengthPx,
+                float leafWidthPx,
+                float leafStartRatio,
+                float leafEndRatio,
+                float leafAngleDegrees,
+                float leafAlpha,
+                float leafVeinAlpha)
             {
                 transform.position = rootWorldPosition;
 
@@ -1594,6 +1622,21 @@ namespace LittlePeopleWorld.Unity
                 var stemGlowColor = Color.Lerp(stemColor, Color.white, 0.5f);
                 stemGlowColor.a = Mathf.Lerp(0.16f, 0.04f, wilt);
                 stemGlowRenderer.color = stemGlowColor;
+
+                RenderLeaves(
+                    plant,
+                    bloomLocalPosition,
+                    worldUnitsPerMaskPx,
+                    leafCount,
+                    leafLengthPx,
+                    leafWidthPx,
+                    leafStartRatio,
+                    leafEndRatio,
+                    leafAngleDegrees,
+                    leafAlpha,
+                    leafVeinAlpha,
+                    wilt,
+                    stemColor);
 
                 var showFlower = plant.CurrentStage is PlantStage.Blooming or PlantStage.Wilting;
                 flowerRenderer.enabled = showFlower;
@@ -1626,6 +1669,84 @@ namespace LittlePeopleWorld.Unity
                 var flowerGlowColor = Color.Lerp(flowerColor, Color.white, 0.55f);
                 flowerGlowColor.a = Mathf.Lerp(0.32f, 0.05f, wilt);
                 flowerGlowRenderer.color = flowerGlowColor;
+            }
+
+            void RenderLeaves(
+                PlantModel plant,
+                Vector3 bloomLocalPosition,
+                float worldUnitsPerMaskPx,
+                int leafCount,
+                float leafLengthPx,
+                float leafWidthPx,
+                float leafStartRatio,
+                float leafEndRatio,
+                float leafAngleDegrees,
+                float leafAlpha,
+                float leafVeinAlpha,
+                float wilt,
+                Color stemColor)
+            {
+                var count = Mathf.Max(0, leafCount);
+                EnsureLeafRenderers(count);
+
+                var stemLength = bloomLocalPosition.magnitude;
+                var canShowLeaves = count > 0 && stemLength > 0.0005f;
+                var stemDirection = canShowLeaves ? bloomLocalPosition.normalized : Vector3.up;
+                var start = Mathf.Clamp01(Mathf.Min(leafStartRatio, leafEndRatio));
+                var end = Mathf.Clamp01(Mathf.Max(leafStartRatio, leafEndRatio));
+                var leafLengthWorld = Mathf.Max(0.004f, leafLengthPx * worldUnitsPerMaskPx);
+                var leafWidthWorld = Mathf.Max(0.002f, leafWidthPx * worldUnitsPerMaskPx);
+                var growthScale = Mathf.Clamp01(stemLength / Mathf.Max(0.0005f, leafLengthWorld * 2.2f));
+
+                for (var i = 0; i < leafRenderers.Count; i++)
+                {
+                    var leafRenderer = leafRenderers[i];
+                    var veinRenderer = leafVeinRenderers[i];
+                    var show = canShowLeaves && i < count && growthScale > 0.05f;
+                    leafRenderer.enabled = show;
+                    veinRenderer.enabled = show;
+                    if (!show)
+                    {
+                        continue;
+                    }
+
+                    var ratio = count == 1 ? 0.5f : Mathf.Lerp(start, end, (float)i / (count - 1));
+                    var side = i % 2 == 0 ? -1f : 1f;
+                    var localPosition = bloomLocalPosition * ratio;
+                    var leafDirection = Quaternion.AngleAxis(leafAngleDegrees * side, Vector3.forward) * stemDirection;
+                    var leafRotation = Quaternion.FromToRotation(Vector3.up, leafDirection);
+                    var phaseScale = Mathf.Lerp(0.72f, 1f, Mathf.Clamp01((ratio - start + 0.08f) / Mathf.Max(0.01f, end - start + 0.08f)));
+                    var leafScale = growthScale * phaseScale;
+
+                    var leafColor = Color.Lerp(new Color(0.24f, 0.76f, 0.34f, leafAlpha), new Color(0.55f, 0.44f, 0.24f, leafAlpha * 0.66f), wilt);
+                    leafColor = Color.Lerp(leafColor, Color.white, i % 2 == 0 ? 0.05f : 0.12f);
+                    leafColor.a = Mathf.Lerp(leafAlpha, leafAlpha * 0.52f, wilt);
+
+                    leafRenderer.transform.localPosition = localPosition;
+                    leafRenderer.transform.localScale = new Vector3(leafWidthWorld * leafScale, leafLengthWorld * leafScale, 1f);
+                    leafRenderer.transform.localRotation = leafRotation;
+                    leafRenderer.color = leafColor;
+
+                    var veinColor = Color.Lerp(new Color(0.78f, 1f, 0.58f, leafVeinAlpha), stemColor, 0.25f);
+                    veinColor.a = Mathf.Lerp(leafVeinAlpha, leafVeinAlpha * 0.25f, wilt);
+                    veinRenderer.transform.localPosition = localPosition + leafDirection * leafLengthWorld * leafScale * 0.38f;
+                    veinRenderer.transform.localScale = new Vector3(
+                        Mathf.Max(0.001f, leafWidthWorld * 0.08f * leafScale),
+                        Mathf.Max(0.002f, leafLengthWorld * 0.58f * leafScale),
+                        1f);
+                    veinRenderer.transform.localRotation = leafRotation;
+                    veinRenderer.color = veinColor;
+                }
+            }
+
+            void EnsureLeafRenderers(int count)
+            {
+                while (leafRenderers.Count < count)
+                {
+                    var index = leafRenderers.Count + 1;
+                    leafRenderers.Add(CreateRenderer($"Leaf {index}", RuntimeSpriteFactory.Leaf, 7));
+                    leafVeinRenderers.Add(CreateRenderer($"Leaf Vein {index}", RuntimeSpriteFactory.Circle, 8));
+                }
             }
 
             SpriteRenderer CreateRenderer(string rendererName, Sprite sprite, int sortingOrder)

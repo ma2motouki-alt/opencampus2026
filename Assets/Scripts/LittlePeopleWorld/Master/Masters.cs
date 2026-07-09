@@ -587,10 +587,10 @@ namespace LittlePeopleWorld.Master
                 new SoundCueMaster(1, "notice chirp", string.Empty),
                 new SoundCueMaster(2, "startle shimmer", string.Empty)
             };
-
+//2.0fは雨の継続時間
             var tuning = new[]
             {
-                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 5.0f, 1.4f, 1.1f)
+                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 2.0f, 1.4f, 1.1f)
             };
 
             return new MasterDatabase(

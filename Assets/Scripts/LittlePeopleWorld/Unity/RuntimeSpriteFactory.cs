@@ -8,6 +8,7 @@ namespace LittlePeopleWorld.Unity
         static Sprite square;
         static Sprite star;
         static Sprite teardrop;
+        static Sprite leaf;
 
         public static Sprite Circle
         {
@@ -72,6 +73,19 @@ namespace LittlePeopleWorld.Unity
                 }
 
                 return teardrop;
+            }
+        }
+
+        public static Sprite Leaf
+        {
+            get
+            {
+                if (leaf == null)
+                {
+                    leaf = CreateLeafSprite(80);
+                }
+
+                return leaf;
             }
         }
 
@@ -145,6 +159,33 @@ namespace LittlePeopleWorld.Unity
             texture.wrapMode = TextureWrapMode.Clamp;
             // pivotは下寄り。回転の中心を膨らみ側に置くと、雨の向き合わせがしやすい。
             return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.28f), size);
+        }
+
+        static Sprite CreateLeafSprite(int size)
+        {
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var centerX = (size - 1) * 0.5f;
+            var maxHalfWidth = size * 0.27f;
+
+            for (var y = 0; y < size; y++)
+            {
+                var t = (float)y / (size - 1);
+                var baseOpen = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t / 0.18f));
+                var tipTaper = Mathf.Pow(Mathf.Clamp01(1f - t), 0.72f);
+                var halfWidth = maxHalfWidth * baseOpen * tipTaper;
+                var curveOffset = Mathf.Sin(t * Mathf.PI) * size * 0.025f;
+
+                for (var x = 0; x < size; x++)
+                {
+                    var dx = Mathf.Abs(x - (centerX + curveOffset));
+                    var alpha = Mathf.Clamp01(halfWidth + 0.75f - dx);
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            texture.Apply();
+            texture.wrapMode = TextureWrapMode.Clamp;
+            return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.08f), size);
         }
 
         static Sprite CreateStarSprite(int size)
