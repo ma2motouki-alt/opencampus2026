@@ -128,6 +128,28 @@ namespace LittlePeopleWorld.Unity
         int effectiveWhiteCount;
         int nextPlantId = 1;
 
+        public bool HasActivePlants => plants.Count > 0;
+
+        public int PlantSpawnSequence { get; private set; }
+        public int PlantBloomSequence { get; private set; }
+        public int FlowerBurstSequence { get; private set; }
+
+        public bool HasGrowingPlants
+        {
+            get
+            {
+                foreach (var plant in plants)
+                {
+                    if (plant.CurrentStage is PlantStage.Seedling or PlantStage.Growing)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
         int MaskW => Mathf.Clamp(maskWidth, 16, 1024);
         int MaskH => Mathf.Clamp(maskHeight, 16, 1024);
 
@@ -498,6 +520,7 @@ namespace LittlePeopleWorld.Unity
         // また一定時間(ReattachCooldown)は、はじけた本人はどの花にも再吸着できない。
         void BurstPlant(PlantModel plant, Vector2 bloomPos)
         {
+            var burstCount = 0;
             foreach (var particle in particles)
             {
                 if (!particle.IsBloomAttached || particle.AttachedPlant != plant)
@@ -514,6 +537,12 @@ namespace LittlePeopleWorld.Unity
                 particle.AttachedPlant = null;
                 particle.BurstFreeTimer = burstFreeSeconds;
                 particle.ReattachCooldown = burstReattachCooldownSeconds;
+                burstCount++;
+            }
+
+            if (burstCount > 0)
+            {
+                FlowerBurstSequence++;
             }
         }
 
@@ -1122,14 +1151,22 @@ namespace LittlePeopleWorld.Unity
                 plantMaxHeightPx);
             newPlant.ReceiveRain();
             plants.Add(newPlant);
+            PlantSpawnSequence++;
         }
 
         void UpdatePlants(float dt)
         {
             for (var i = plants.Count - 1; i >= 0; i--)
             {
-                plants[i].Advance(dt);
-                if (plants[i].CurrentStage == PlantStage.Dead)
+                var plant = plants[i];
+                var wasBloomable = plant.IsBloomable;
+                plant.Advance(dt);
+                if (!wasBloomable && plant.IsBloomable)
+                {
+                    PlantBloomSequence++;
+                }
+
+                if (plant.CurrentStage == PlantStage.Dead)
                 {
                     plants.RemoveAt(i);
                 }
