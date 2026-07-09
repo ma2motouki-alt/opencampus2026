@@ -65,6 +65,9 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float plantSpawnMergingRadiusRatio = 0.5f;
         [SerializeField] float plantInfluenceRadiusRatio = 0.8f;
         [SerializeField] float plantClimbAttractRadiusRatio = 0.3f;
+        // 登り中(IsClimbing)の粒を、通常移動より確実に花へ向かわせるための倍率。
+        // 1.0だと通常移動と同じ強さのまま、値を上げるほど登りが速く・向きの追従も鋭くなる。
+        [SerializeField] float plantClimbSpeedMultiplier = 2.0f;
         [SerializeField] float plantSeedlingDuration = 10f;
         [SerializeField] float plantGrowingDuration = 10f;
         [SerializeField] float plantWiltingStartDelay = 5f;
@@ -74,6 +77,16 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float bloomAttractRadiusRatio = 0.5f;
         [SerializeField] float bloomSphereRadiusRatio = 1.0f;
         [SerializeField] float bloomAttractForce = 300f;
+
+        // 花のはじけ(A): rain_shape版はペン描画で変化したマスクピクセル数(burstMinChangedPixels)を
+        // 閾値にしていたが、mainでは手の輪郭(Hand種別のInteractionObject)がそのまま入力になるため、
+        // 「ラスタのノイズ的な単発ピクセル」を弾く必要がなく、bloomSphereRadius(既存の吸い付き範囲)への
+        // 幾何学的な重なり判定だけで十分に安定する。そのため burstMinChangedPixels 相当のしきい値は
+        // 廃止し、代わりに「手の輪郭が bloomSphereRadius 以内に入った瞬間」を発火条件にしている。
+        [Header("Flower Burst")]
+        [SerializeField] float burstInitialSpeedPxPerSec = 220f;
+        [SerializeField] float burstFreeSeconds = 1.5f;
+        [SerializeField] float burstReattachCooldownSeconds = 2.0f;
 
         readonly List<Particle> particles = new();
         readonly List<PlantModel> plants = new();
@@ -121,6 +134,10 @@ namespace LittlePeopleWorld.Unity
             RenderMaskTexture();
 
             var dt = Mathf.Clamp(deltaTime, 0f, 0.05f);
+
+            // 粒の操舵より前に判定する(はじけた粒がこのフレームから自由飛散状態になるようにするため)
+            HandleFlowerBurst(world.InteractionObjects);
+
             AdvanceParticles(dt);
             AdvanceRainPlants(world, masters, dt);
             SetVisible(true);
@@ -348,6 +365,134 @@ namespace LittlePeopleWorld.Unity
             }
         }
 
+        // ================= 花のはじけ(A) =================
+        //
+        // rain_shape版はペン/消しゴムで変化したマスクピクセルが花の吸い付き範囲(bloomSphereRadius)
+        // 内に一定数以上あれば発火していたが、mainでは手の輪郭(Hand種別のInteractionObject)が
+        // 直接の入力になるため、「手の輪郭がbloomSphereRadius以内に入った瞬間」を発火条件とする。
+        //
+        // 「触れている間ずっと」ではなく「触れた瞬間」だけ発火させたいので、
+        // 各植物ごとに前フレームの接触状態(PlantModel.HandTouchingBloom)を保持し、
+        // false→true に変化した立ち上がりエッジでのみ BurstPlant を呼ぶ。
+        void HandleFlowerBurst(IReadOnlyList<InteractionObject> objects)
+        {
+            if (plants.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var plant in plants)
+            {
+                if (!plant.IsBloomable)
+                {
+                    // 開花していない植物には、はじけの接触状態を持たせない
+                    plant.HandTouchingBloom = false;
+                    continue;
+                }
+
+                var bloomPos = plant.BloomPosition;
+                var bloomSphereRadius = Mathf.Max(4f, plant.HeightPx * bloomSphereRadiusRatio);
+                var isTouchingNow = IsHandContourNearBloom(objects, bloomPos, bloomSphereRadius);
+
+                if (isTouchingNow && !plant.HandTouchingBloom)
+                {
+                    BurstPlant(plant, bloomPos);
+                }
+
+                plant.HandTouchingBloom = isTouchingNow;
+            }
+        }
+
+        // Hand種別・輪郭形状のInteractionObjectのうち、いずれかの輪郭がbloomPosから
+        // bloomSphereRadius以内に重なっているかを判定する(1つでも重なっていればtrue)。
+        bool IsHandContourNearBloom(IReadOnlyList<InteractionObject> objects, Vector2 bloomPosPx, float bloomSphereRadiusPx)
+        {
+            foreach (var interactionObject in objects)
+            {
+                if (interactionObject == null ||
+                    interactionObject.Kind != InteractionObjectKind.Hand ||
+                    interactionObject.ShapeKind != InteractionShapeKind.Contour ||
+                    interactionObject.ContourPoints.Count < 3)
+                {
+                    continue;
+                }
+
+                var polygon = new Vector2[interactionObject.ContourPoints.Count];
+                for (var i = 0; i < polygon.Length; i++)
+                {
+                    polygon[i] = NormalizedToMaskPx(interactionObject.ContourPoints[i]);
+                }
+
+                if (DistancePointToPolygon(polygon, bloomPosPx) <= bloomSphereRadiusPx)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // 点から多角形までの最短距離。点が多角形の内側にある場合は0を返す。
+        static float DistancePointToPolygon(IReadOnlyList<Vector2> polygon, Vector2 point)
+        {
+            if (IsPointInsidePolygon(polygon, point))
+            {
+                return 0f;
+            }
+
+            var minDistance = float.MaxValue;
+            for (var i = 0; i < polygon.Count; i++)
+            {
+                var a = polygon[i];
+                var b = polygon[(i + 1) % polygon.Count];
+                var distance = DistancePointToSegment(point, a, b);
+                if (distance < minDistance)
+                {
+                    minDistance = distance;
+                }
+            }
+
+            return minDistance;
+        }
+
+        static float DistancePointToSegment(Vector2 point, Vector2 a, Vector2 b)
+        {
+            var segment = b - a;
+            var lengthSquared = segment.sqrMagnitude;
+            if (lengthSquared <= 0.000001f)
+            {
+                return Vector2.Distance(point, a);
+            }
+
+            var t = Mathf.Clamp01(Vector2.Dot(point - a, segment) / lengthSquared);
+            var closest = a + segment * t;
+            return Vector2.Distance(point, closest);
+        }
+
+        // 指定した花に現在吸い付いている粒を、花の中心から放射状に弾き飛ばす。
+        // はじけた粒は一定時間「自由飛散状態」(BurstFreeTimer > 0)となり、操舵されず慣性で飛ぶ。
+        // また一定時間(ReattachCooldown)は、はじけた本人はどの花にも再吸着できない。
+        void BurstPlant(PlantModel plant, Vector2 bloomPos)
+        {
+            foreach (var particle in particles)
+            {
+                if (!particle.IsBloomAttached || particle.AttachedPlant != plant)
+                {
+                    continue;
+                }
+
+                var dir = particle.Pos - bloomPos;
+                dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : UnityEngine.Random.insideUnitCircle.normalized;
+
+                particle.Vel = dir * burstInitialSpeedPxPerSec;
+                particle.IsBloomAttached = false;
+                particle.IsClimbing = false;
+                particle.AttachedPlant = null;
+                particle.BurstFreeTimer = burstFreeSeconds;
+                particle.ReattachCooldown = burstReattachCooldownSeconds;
+            }
+        }
+
         void RenderMaskTexture()
         {
             var off = transparentMaskBackground ? new Color32(0, 0, 0, 0) : maskOffColor;
@@ -410,6 +555,35 @@ namespace LittlePeopleWorld.Unity
 
         void UpdateParticle(Particle particle, Vector2 separationForce, float dt)
         {
+            // タイマー類を減衰させる(状態に関わらず毎フレーム進める)
+            if (particle.ReattachCooldown > 0f)
+            {
+                particle.ReattachCooldown = Mathf.Max(0f, particle.ReattachCooldown - dt);
+            }
+
+            // 0. 自由飛散状態(はじけた直後)。他の操舵より最優先で、分離力だけを受けて慣性で飛ぶ。
+            if (particle.BurstFreeTimer > 0f)
+            {
+                particle.BurstFreeTimer = Mathf.Max(0f, particle.BurstFreeTimer - dt);
+
+                particle.Vel += separationForce;
+                particle.Pos += particle.Vel * dt;
+
+                // 画面の縁で緩やかに跳ね返して、外へ突き抜けないようにする
+                if (particle.Pos.x < 1f || particle.Pos.x > MaskW - 2f)
+                {
+                    particle.Vel.x *= -0.6f;
+                }
+
+                if (particle.Pos.y < 1f || particle.Pos.y > MaskH - 2f)
+                {
+                    particle.Vel.y *= -0.6f;
+                }
+
+                ClampParticlePosition(particle);
+                return;
+            }
+
             if (particle.IsBloomAttached && particle.AttachedPlant != null && particle.AttachedPlant.IsBloomable)
             {
                 UpdateBloomAttached(particle, particle.AttachedPlant, separationForce, dt);
@@ -463,8 +637,11 @@ namespace LittlePeopleWorld.Unity
                 combined = particle.Vel.sqrMagnitude > 0.0001f ? particle.Vel.normalized : UnityEngine.Random.insideUnitCircle;
             }
 
-            var desiredVelocity = combined.normalized * speedPxPerSec * particle.SpeedScale;
-            var t = 1f - Mathf.Exp(-steerLerp * dt);
+        // 登り中は花への向きをより強く・より速く追従させる(plantClimbSpeedMultiplier)
+            var climbBoost = particle.IsClimbing ? Mathf.Max(1f, plantClimbSpeedMultiplier) : 1f;
+
+            var desiredVelocity = combined.normalized * speedPxPerSec * particle.SpeedScale * climbBoost;
+            var t = 1f - Mathf.Exp(-steerLerp * climbBoost * dt);
             particle.Vel = Vector2.Lerp(particle.Vel, desiredVelocity, t);
 
             if (particle.IsClimbing)
@@ -475,7 +652,7 @@ namespace LittlePeopleWorld.Unity
             particle.Pos += particle.Vel * dt;
             ClampParticlePosition(particle);
 
-            if (particle.IsClimbing && plant != null && plant.IsBloomable)
+            if (particle.IsClimbing && plant != null && plant.IsBloomable && particle.ReattachCooldown <= 0f)
             {
                 var bloomAttractRadius = Mathf.Max(4f, plant.HeightPx * bloomAttractRadiusRatio);
                 if (Vector2.Distance(particle.Pos, plant.BloomPosition) <= bloomAttractRadius)
@@ -537,10 +714,13 @@ namespace LittlePeopleWorld.Unity
 
         (Vector2 Direction, bool IsClimbing) ComputePlantApproach(Particle particle, PlantModel plant)
         {
-            var distanceToBase = Vector2.Distance(particle.Pos, plant.Position);
+            // 根元(Position)の1点だけでなく、根元→花(BloomPosition)の「茎全体の線分」までの
+            // 最短距離で判定する。こうすることで、判定範囲が根元を中心とした円ではなく、
+            // 茎の先端まで届くカプセル状の領域になる。
+            var distanceToStem = DistancePointToSegment(particle.Pos, plant.Position, plant.BloomPosition);
             var climbRadius = Mathf.Max(4f, plant.HeightPx * plantClimbAttractRadiusRatio);
 
-            if (distanceToBase <= climbRadius)
+            if (distanceToStem <= climbRadius)
             {
                 var toTop = plant.BloomPosition - particle.Pos;
                 return (toTop.sqrMagnitude > 0.0001f ? toTop.normalized : Vector2.up, true);
@@ -1078,6 +1258,12 @@ namespace LittlePeopleWorld.Unity
             public bool IsClimbing;
             public bool IsBloomAttached;
             public PlantModel AttachedPlant;
+
+            // 花のはじけ(A)で追加した状態。
+            // BurstFreeTimer > 0 の間は「自由飛散状態」(操舵されず慣性+分離力だけで飛ぶ)。
+            // ReattachCooldown > 0 の間は、はじけた本人がどの花にも再吸着できない(粒ごとのクールダウン)。
+            public float BurstFreeTimer;
+            public float ReattachCooldown;
         }
 
         enum PlantStage
@@ -1122,6 +1308,10 @@ namespace LittlePeopleWorld.Unity
             public float HeightPx { get; private set; }
             public Vector2 BloomPosition => new(Position.x, Position.y + HeightPx);
             public bool IsBloomable => CurrentStage is PlantStage.Blooming or PlantStage.Wilting;
+
+            // 花のはじけ(A)の発火判定(立ち上がりエッジ検出)用。
+            // 前フレームの時点で「手の輪郭がbloomSphereRadius以内にあったか」を保持する。
+            public bool HandTouchingBloom;
 
             public PlantStage CurrentStage
             {
@@ -1170,13 +1360,17 @@ namespace LittlePeopleWorld.Unity
 
         sealed class PlantViewRuntime : MonoBehaviour
         {
+            SpriteRenderer stemGlowRenderer;
             SpriteRenderer stemRenderer;
+            SpriteRenderer flowerGlowRenderer;
             SpriteRenderer flowerRenderer;
             SpriteRenderer flowerCenterRenderer;
 
             public void Initialize()
             {
-                stemRenderer = CreateRenderer("Stem", RuntimeSpriteFactory.Square, 6);
+                stemGlowRenderer = CreateRenderer("StemGlow", RuntimeSpriteFactory.Circle, -3);
+                stemRenderer = CreateRenderer("Stem", RuntimeSpriteFactory.Circle, 6);
+                flowerGlowRenderer = CreateRenderer("FlowerGlow", RuntimeSpriteFactory.Circle, 7);
                 flowerRenderer = CreateRenderer("Flower", RuntimeSpriteFactory.Star, 8);
                 flowerCenterRenderer = CreateRenderer("FlowerCenter", RuntimeSpriteFactory.Circle, 9);
             }
@@ -1208,9 +1402,18 @@ namespace LittlePeopleWorld.Unity
                 stemRenderer.transform.localRotation = Quaternion.FromToRotation(Vector3.up, bloomLocalPosition.normalized);
                 stemRenderer.color = stemColor;
 
+                // 茎のglow(発光ハロー)。茎本体と同じ位置・向きで、太さと丈をひと回り大きくして重ねる。
+                stemGlowRenderer.transform.localPosition = stemCenter;
+                stemGlowRenderer.transform.localScale = new Vector3(stemWidthWorld * 3.2f, stemHeightWorld * 1.05f, 1f);
+                stemGlowRenderer.transform.localRotation = stemRenderer.transform.localRotation;
+                var stemGlowColor = Color.Lerp(stemColor, Color.white, 0.5f);
+                stemGlowColor.a = Mathf.Lerp(0.16f, 0.04f, wilt);
+                stemGlowRenderer.color = stemGlowColor;
+
                 var showFlower = plant.CurrentStage is PlantStage.Blooming or PlantStage.Wilting;
                 flowerRenderer.enabled = showFlower;
                 flowerCenterRenderer.enabled = showFlower;
+                flowerGlowRenderer.enabled = showFlower;
                 if (!showFlower)
                 {
                     return;
@@ -1230,6 +1433,14 @@ namespace LittlePeopleWorld.Unity
                 flowerCenterRenderer.transform.localScale = Vector3.one * flowerBaseScale * 0.42f * bloomOpen;
                 flowerCenterRenderer.transform.localRotation = Quaternion.identity;
                 flowerCenterRenderer.color = Color.Lerp(Color.white, flowerColor, 0.35f);
+
+                // 花のglow(発光ハロー)。開閉(bloomOpen)には連動させず、常に一定サイズで淡く発光させる。
+                flowerGlowRenderer.transform.localPosition = bloomLocalPosition;
+                flowerGlowRenderer.transform.localScale = Vector3.one * flowerBaseScale * 2.4f;
+                flowerGlowRenderer.transform.localRotation = Quaternion.identity;
+                var flowerGlowColor = Color.Lerp(flowerColor, Color.white, 0.55f);
+                flowerGlowColor.a = Mathf.Lerp(0.32f, 0.05f, wilt);
+                flowerGlowRenderer.color = flowerGlowColor;
             }
 
             SpriteRenderer CreateRenderer(string rendererName, Sprite sprite, int sortingOrder)

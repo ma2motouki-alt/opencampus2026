@@ -91,7 +91,8 @@ namespace LittlePeopleWorld.Unity
         {
             for (var i = 0; i < DropCount; i++)
             {
-                renderers.Add(CreateRenderer(root, $"Rain {i + 1}", RuntimeSpriteFactory.Square, 1));
+                // 四角の棒 → 涙(teardrop)型スプライトに変更
+                renderers.Add(CreateRenderer(root, $"Rain {i + 1}", RuntimeSpriteFactory.Teardrop, 1));
             }
 
             Hide();
@@ -113,11 +114,16 @@ namespace LittlePeopleWorld.Unity
                 var x = (seed - 0.5f) * width;
                 var phase = Mathf.Repeat(effect.AgeSeconds * master.PulseSpeed * 0.22f + i * 0.137f, 1f);
                 var y = -phase * height;
-                var lineLength = Mathf.Lerp(height * 0.12f, height * 0.24f, Mathf.Repeat(seed * 3.1f, 1f));
+                // しずく1粒の大きさ。縦長(高さ>幅)にして水滴らしくする。
+                // master.DropSizeScale で全体のサイズを独立して調整できる(既定1f)。
+                var dropLength = Mathf.Lerp(height * 0.10f, height * 0.18f, Mathf.Repeat(seed * 3.1f, 1f)) * master.DropSizeScale;
+                var dropWidth = dropLength * 0.42f;
 
                 renderer.transform.localPosition = new Vector3(x, y, 0f);
-                renderer.transform.localRotation = Quaternion.Euler(0f, 0f, -8f + Mathf.Sin(i * 1.7f) * 8f);
-                renderer.transform.localScale = new Vector3(width * 0.035f, lineLength, 1f);
+                // Teardropは元々「上がとがり下が丸い」形状なので、そのままの向きで使う。
+                // 落下方向(下向き)にとがった先端が来ないよう、回転は傾き演出だけにとどめる。
+                renderer.transform.localRotation = Quaternion.Euler(0f, 0f, Mathf.Sin(i * 1.7f) * 8f);
+                renderer.transform.localScale = new Vector3(dropWidth, dropLength, 1f);
 
                 var color = master.Color;
                 color.a = alpha * Mathf.Lerp(0.55f, 1f, phase);
