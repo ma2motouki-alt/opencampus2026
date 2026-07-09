@@ -213,6 +213,7 @@ GameObject:
   - component: {fileID: 793252708}
   - component: {fileID: 793252707}
   - component: {fileID: 793252709}
+  - component: {fileID: 793252710}
   m_Layer: 0
   m_Name: Little People World
   m_TagString: Untagged
@@ -230,7 +231,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f47b0925295d40e40b74c7e402d95b01, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: 
 --- !u!4 &793252708
 Transform:
@@ -257,7 +258,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ab987c82c3591b94baba15373fa3b448, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: LittlePeopleWorld::LittlePeopleWorld.Unity.LittlePeopleWorldController
   targetCamera: {fileID: 0}
   inputProviderMode: 2
@@ -266,6 +267,38 @@ MonoBehaviour:
   worldPresetId: 1
   worldHeight: 10
   showHelpOverlay: 1
+--- !u!114 &793252710
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 793252706}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a9500e4fdc04c30a780469862ef9232, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: LittlePeopleWorld::LittlePeopleWorld.Unity.WorldAudioController
+  baseAmbientClip: {fileID: 0}
+  rainLayerClip: {fileID: 8300000, guid: 1f1ab0f609c59b148ba67248798c9ca0, type: 3}
+  plantGrowthLayerClip: {fileID: 0}
+  plantStartClip: {fileID: 8300000, guid: f823da8bc1532aa4a8e22e4eacb5f00c, type: 3}
+  plantBloomClip: {fileID: 8300000, guid: 7640d5c0e4f43d8479ae473041292c63, type: 3}
+  flowerBurstClip: {fileID: 8300000, guid: fda6e12d1defe2e4a874f274628a0aac, type: 3}
+  masterVolume: 1
+  baseAmbientVolume: 0.35
+  rainLayerVolume: 0.45
+  plantGrowthLayerVolume: 0.25
+  plantStartVolume: 0.5
+  plantBloomVolume: 0.55
+  flowerBurstVolume: 0.65
+  layerFadeSeconds: 1.2
+  playBaseAmbient: 1
+  enableRainLayer: 1
+  enablePlantGrowthLayer: 1
+  enablePlantStartOneShot: 1
+  enablePlantBloomOneShot: 1
+  enableFlowerBurstOneShot: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

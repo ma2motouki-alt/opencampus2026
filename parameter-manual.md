@@ -96,7 +96,35 @@ The cloud contact radius itself is defined in `AmbientObjectTypeMaster`.
 | `burstFreeSeconds` | `1.5` | Time particles fly freely after burst. |
 | `burstReattachCooldownSeconds` | `2.0` | Time before a burst particle can attach again. |
 
-Flower burst is triggered when a hand contour touches the flower area. It does not use the old paint-mask changed-pixel threshold.
+Flower burst is triggered when a hand contour touches the flower area. It does not use the old paint-mask changed-pixel threshold. The burst SE plays only when at least one flower-attached particle is actually released.
+
+### Audio Layers
+
+`WorldAudioController` is created automatically by `LittlePeopleWorldController` when audio layers are enabled. Add the component to the same GameObject in edit mode when you want to assign clips from the Inspector.
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `enableAudioLayers` | `true` | Enable the layered audio controller. This lives on `LittlePeopleWorldController`. |
+| `baseAmbientClip` | none | Always-on ambient loop. |
+| `rainLayerClip` | none | Loop that fades in while `RainColumn` effects exist. |
+| `plantGrowthLayerClip` | none | Loop that fades in while plants are seedling/growing. |
+| `plantStartClip` | none | One-shot SE played when a new plant is created by rain. |
+| `plantBloomClip` | none | One-shot SE played when a plant first reaches the flower-visible stage. |
+| `flowerBurstClip` | none | One-shot SE played when a touched flower releases attached particles. |
+| `masterVolume` | `1` | Global multiplier for all audio layers. |
+| `baseAmbientVolume` | `0.35` | Target volume for the base ambient layer. |
+| `rainLayerVolume` | `0.45` | Target volume for the rain layer. |
+| `plantGrowthLayerVolume` | `0.25` | Target volume for the plant growth layer. |
+| `plantStartVolume` | `0.5` | One-shot SE volume for new plant start. |
+| `plantBloomVolume` | `0.55` | One-shot SE volume for the flower-bloom timing. |
+| `flowerBurstVolume` | `0.65` | One-shot SE volume for the flower burst timing. |
+| `layerFadeSeconds` | `1.2` | Fade duration for layer volume changes. |
+| `playBaseAmbient` | `true` | Play the base ambient layer. |
+| `enableRainLayer` | `true` | Enable the rain layer. |
+| `enablePlantGrowthLayer` | `true` | Enable the plant growth layer. |
+| `enablePlantStartOneShot` | `true` | Enable the new-plant one-shot SE. |
+| `enablePlantBloomOneShot` | `true` | Enable the flower-bloom one-shot SE. |
+| `enableFlowerBurstOneShot` | `true` | Enable the flower burst one-shot SE. |
 
 ## Master Data Parameters
 

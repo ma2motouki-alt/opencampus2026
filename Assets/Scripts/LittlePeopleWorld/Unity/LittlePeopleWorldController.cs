@@ -25,6 +25,8 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] bool showHelpOverlay = true;
         [SerializeField] bool enableRecognitionMaskAnimation = true;
         [SerializeField] WorldSpaceMaskAnimationController maskAnimationController;
+        [SerializeField] bool enableAudioLayers = true;
+        [SerializeField] WorldAudioController audioController;
 
         readonly List<LittlePersonView> littlePersonViews = new();
         readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
@@ -79,6 +81,7 @@ namespace LittlePeopleWorld.Unity
             SyncAmbientObjectViews();
             SyncVisualEffectViews();
             SyncRecognitionMaskAnimation();
+            SyncAudioLayers();
         }
 
         void OnGUI()
@@ -137,8 +140,19 @@ namespace LittlePeopleWorld.Unity
             targetCamera.clearFlags = CameraClearFlags.SolidColor;
             targetCamera.backgroundColor = masters.WorldPresets.Get(worldPresetId).BackgroundColor;
             mapper = new NormalizedScreenMapper(targetCamera, worldHeight);
+            EnsureAudioListener();
 
             EnsureInputProviders();
+        }
+
+        void EnsureAudioListener()
+        {
+            if (targetCamera == null || FindFirstObjectByType<AudioListener>() != null)
+            {
+                return;
+            }
+
+            targetCamera.gameObject.AddComponent<AudioListener>();
         }
 
         void EnsureInputProviders()
@@ -196,6 +210,19 @@ namespace LittlePeopleWorld.Unity
             }
         }
 
+        void EnsureAudioController()
+        {
+            if (audioController == null)
+            {
+                audioController = GetComponent<WorldAudioController>();
+            }
+
+            if (audioController == null)
+            {
+                audioController = gameObject.AddComponent<WorldAudioController>();
+            }
+        }
+
         void BuildWorld()
         {
             world = orchestrator.CreateWorld(worldPresetId);
@@ -206,6 +233,7 @@ namespace LittlePeopleWorld.Unity
             ambientRoot = CreateRoot("Ambient Objects");
             effectsRoot = CreateRoot("Visual Effects");
             EnsureRecognitionMaskAnimation();
+            EnsureAudioController();
             BuildLittlePersonViews();
         }
 
@@ -383,6 +411,33 @@ namespace LittlePeopleWorld.Unity
 
             EnsureRecognitionMaskAnimation();
             maskAnimationController.Render(world, masters, mapper, Time.deltaTime, IsDebugEnabled());
+        }
+
+        void SyncAudioLayers()
+        {
+            if (!enableAudioLayers)
+            {
+                if (audioController != null)
+                {
+                    audioController.SetAudioActive(false);
+                }
+
+                return;
+            }
+
+            EnsureAudioController();
+            var plantGrowthActive = maskAnimationController != null && maskAnimationController.HasGrowingPlants;
+            var plantSpawnSequence = maskAnimationController != null ? maskAnimationController.PlantSpawnSequence : 0;
+            var plantBloomSequence = maskAnimationController != null ? maskAnimationController.PlantBloomSequence : 0;
+            var flowerBurstSequence = maskAnimationController != null ? maskAnimationController.FlowerBurstSequence : 0;
+            audioController.UpdateAudio(
+                world,
+                masters,
+                Time.deltaTime,
+                plantGrowthActive,
+                plantSpawnSequence,
+                plantBloomSequence,
+                flowerBurstSequence);
         }
 
         InteractionField FindField(int sourceObjectId)
