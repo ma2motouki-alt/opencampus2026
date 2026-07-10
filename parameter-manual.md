@@ -98,6 +98,20 @@ The cloud contact radius itself is defined in `AmbientObjectTypeMaster`.
 | `plantWiltingStartDelay` | `5` | Delay before wilting after blooming. |
 | `plantWiltingDuration` | `15` | Wilting duration. |
 
+### Rain Occlusion
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `enableRainOcclusionByMask` | `true` | Prevent rain from reaching the ground when the vertical rain path intersects the current recognition mask. |
+| `rainOcclusionProbeRadiusPx` | `1` | Horizontal mask-pixel radius checked around each falling rain sample. Higher values make occlusion easier to trigger. |
+| `rainOcclusionTopPaddingPx` | `1` | Skips a small area just below the rain origin to avoid immediate self-blocking near the cloud/rain source. |
+| `showRainOcclusionDebug` | `false` | Adds rain occlusion counters to the debug overlay when `D` debug display is enabled. |
+| `enableRainVisualOcclusion` | `true` | Shorten the visible rain column when its path intersects the current recognition mask. |
+| `rainOcclusionVisualSmoothingSeconds` | `0.12` | Smooths visible rain-height changes to reduce flicker from noisy masks. Set to `0` for immediate clipping. |
+| `rainOcclusionMinVisibleHeightPx` | `4` | Minimum visible clipped rain height in mask pixels, preventing rain from disappearing completely at the source. |
+
+Phase 1 blocks plant spawning/growth. Phase 2 also clips the visible rain column at the first detected occlusion height.
+
 ### Plant Leaves
 
 | Parameter | Default | Meaning |
