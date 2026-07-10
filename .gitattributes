@@ -1,0 +1,34 @@
+# Normalize text files for team development.
+* text=auto
+
+# Source and docs
+*.cs text eol=lf
+*.asmdef text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.gitignore text eol=lf
+
+# Unity YAML assets
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.meta text eol=lf
+*.mat text eol=lf
+*.controller text eol=lf
+*.anim text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.mp4 binary
+*.wav binary
+*.mp3 binary
+*.fbx binary
+*.blend binary
+*.psd binary
+*.tga binary
+*.ttf binary
+*.otf binary

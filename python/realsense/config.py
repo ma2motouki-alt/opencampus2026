@@ -1,0 +1,62 @@
+UDP_HOST = "127.0.0.1"
+UDP_PORT = 5005
+SEND_RATE_HZ = 30
+
+REALSENSE_WIDTH = 640
+REALSENSE_HEIGHT = 480
+REALSENSE_FPS = 30
+REALSENSE_FRAME_TIMEOUT_MS = 5000
+REALSENSE_FRAME_RETRY_COUNT = 3
+
+BASELINE_FRAME_COUNT = 30
+HEIGHT_THRESHOLD_METERS = 0.015
+MIN_CONTOUR_AREA_PIXELS = 500
+MORPH_KERNEL_SIZE = 5
+MAX_OBJECTS = 8
+
+DEBUG_PREVIEW = True
+DEBUG_SHOW_HEIGHT_MAP = True
+DEBUG_SHOW_MASK_STAGES = True
+DEBUG_SHOW_REJECTED_CONTOURS = True
+DEBUG_PRINT_OBJECT_SUMMARY = False
+DEBUG_PRINT_SUMMARY_INTERVAL_SECONDS = 1.0
+
+DEFAULT_OBJECT_KIND = "hand"
+DEFAULT_OBJECT_STATE = "placed"
+# "auto" sends slender contours as bar_prop and other contours as hand.
+# "fixed" sends every contour as DEFAULT_OBJECT_KIND or --kind.
+CLASSIFIER_MODE = "auto"
+
+# "front" maps camera image coordinates directly to normalized display coordinates.
+# "homography" uses calibration.json for oblique camera placement.
+MAPPER_MODE = "front"
+CALIBRATION_PATH = "calibration.json"
+FLIP_X = False
+FLIP_Y = False
+
+# Tracker values are in normalized display coordinates.
+TRACK_MAX_DISTANCE = 0.12
+TRACK_TTL_SECONDS = 0.5
+
+# Hand contour extraction.
+MAX_HANDS = 2
+HAND_MIN_CONTOUR_AREA_PIXELS = 800
+HAND_MAX_CONTOUR_AREA_PIXELS = 80000
+HAND_APPROX_EPSILON_RATIO = 0.005
+HAND_MAX_POINTS = 80
+HAND_MIN_POINTS = 8
+HAND_MAX_ASPECT_RATIO = 4.5
+HAND_MIN_NORMALIZED_SIZE = 0.015
+HAND_REACTION_SIZE_SCALE = 1.0
+
+# Slender contour classification for bar-like objects.
+BAR_MIN_ASPECT_RATIO = 3.0
+BAR_MIN_LENGTH_NORMALIZED = 0.08
+BAR_MAX_THICKNESS_NORMALIZED = 0.12
+
+# Small contours can produce very thin boxes. These defaults keep Unity visible.
+MIN_NORMALIZED_WIDTH = 0.015
+MIN_NORMALIZED_HEIGHT = 0.015
+
+# Height is sent in meters for now. Unity clamps it to 0.0..1.0.
+MAX_SENT_HEIGHT_METERS = 0.3

@@ -1,0 +1,107 @@
+﻿# Master Data Design
+
+Master data is immutable while the app is running. Domain objects hold runtime state and reference master records by id.
+
+## Naming
+
+- `~Master`: immutable definition record.
+- `~Table`: in-memory table of master records.
+- `~Instance`: runtime object created from or referencing a master.
+
+## Current Master Tables
+
+| Master | Purpose |
+|---|---|
+| `WorldPresetMaster` | Initial little-person count, background color, and environment theme. |
+| `LittlePersonArchetypeMaster` | Little-person color, size, speed, curiosity, and fear. |
+| `BehaviorProfileMaster` | Edge-walk timing and personality tuning. |
+| `ReactionMaster` | Runtime reaction kinds. |
+| `ReactionConditionMaster` | Reaction conditions. |
+| `InteractionObjectTypeMaster` | Hand, round prop, bar prop, block prop defaults. |
+| `InteractionFieldMaster` | Repel, curiosity, and legacy field definitions. |
+| `WalkableSurfaceMaster` | Prop edge walking, riding, transfer, obstacle, and reconnect tuning. |
+| `AmbientObjectTypeMaster` | Cloud and star size, drift, touch radius, movement band, and effect link. |
+| `VisualEffectMaster` | Procedural or prefab visual effect definitions. |
+| `SoundCueMaster` | Placeholder for future audio cues. |
+| `TuningParameterMaster` | Global runtime tuning. |
+
+## Important Current Values
+
+### World
+
+- Preset id: `1`
+- Little people count: `42`
+- Background: dark table color
+
+### Walkable Surface
+
+`WalkableSurfaceMaster` default values include:
+
+- `AttachDistance = 0.14`
+- `DetachDistance = 0.22`
+- `SurfaceWalkSpeed = 0.13`
+- `RideVelocityLimit = 0.72`
+- `SurfaceWidth = 0.022`
+- `BarVisualScale = 4.32`
+- `TransferDurationSeconds = 0.22`
+- `AttachProgressInset = 0.03`
+- `ExitProgressInset = 0.0`
+- `SurfaceExitDwellSeconds = 0.2`
+- `SurfaceConnectionDistance = 0.08`
+- `SurfaceConnectionTransferDurationSeconds = 0.16`
+- `SurfaceConnectionCooldownSeconds = 0.25`
+- `TwoSidedVerticalToleranceDegrees = 15`
+- `AttachSideTolerance = 0.01`
+- `BarObstaclePadding = 0.01`
+- `EdgeBlockBackoffDistance = 0.015`
+- `EdgeBlockCooldownSeconds = 0.25`
+
+The current bar walking model uses the visible rectangle edge, not a separate outside platform.
+
+### Cloud
+
+Cloud master:
+
+- Size: `0.095 x 0.05`
+- Drift: `0.014 x 0.003`
+- Contact radius: `0.075`
+- Visual effect: `RainColumn`
+- Movement edge padding: `0.18`
+- Max center Y: `0.38`
+
+The movement band keeps clouds away from ordinary edge-walk routes.
+
+### Star
+
+- Size: `0.06 x 0.06`
+- Drift: `0.01 x 0.006`
+- Contact radius: `0.085`
+- Visual effect: `StarBurst`
+
+### Rain
+
+`RainColumn` master:
+
+- Pulse speed: `4.0`
+- Alpha: `0.72`
+- Default size: `0.075 x 0.28`
+- Duration: `0.45`
+- Drop size scale: `0.4`
+
+### Global Tuning
+
+Important values:
+
+- `WorldEdgePadding = 0.03`
+- `InputHitPadding = 0.02`
+- `HandContourReactionPadding = 0.035`
+- `FallDuration = 0.72`
+- `AmbientCloudCount = 2`
+- `AmbientStarCount = 2`
+- `RainLingerSeconds = 5.0`
+- `StarCooldownSeconds = 1.4`
+- `SurfaceReconnectCooldownSeconds = 1.1`
+
+## Externalization
+
+Masters are still C# immutable objects and in-memory tables. SQLite, MasterMemory, ScriptableObject conversion, or CSV import are deferred.
