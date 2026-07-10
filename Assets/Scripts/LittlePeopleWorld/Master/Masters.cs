@@ -516,14 +516,16 @@ namespace LittlePeopleWorld.Master
         {
             var worldPresets = new[]
             {
-                new WorldPresetMaster(1, "MVP dark table", 42, 1, 1, new Color(0.015f, 0.014f, 0.02f, 1f))
+                //小人の数を調整
+                new WorldPresetMaster(1, "MVP dark table", 20, 1, 1, new Color(0.015f, 0.014f, 0.02f, 1f))
             };
 
             var littlePeople = new[]
             {
-                new LittlePersonArchetypeMaster(1, "curious glow", new Color(0.7f, 1f, 0.86f, 1f), 0.018f, 0.13f, 0.78f, 0.35f),
-                new LittlePersonArchetypeMaster(2, "shy violet", new Color(0.92f, 0.66f, 1f, 1f), 0.017f, 0.12f, 0.58f, 0.66f),
-                new LittlePersonArchetypeMaster(3, "bright scout", new Color(1f, 0.95f, 0.45f, 1f), 0.016f, 0.15f, 0.9f, 0.28f)
+                new LittlePersonArchetypeMaster(1, "blue walker", new Color(0.45f, 0.76f, 1f, 1f), 0.018f, 0.13f, 0.78f, 0.35f),
+                new LittlePersonArchetypeMaster(2, "green walker", new Color(0.55f, 1f, 0.72f, 1f), 0.017f, 0.12f, 0.58f, 0.66f),
+                new LittlePersonArchetypeMaster(3, "red walker", new Color(1f, 0.48f, 0.45f, 1f), 0.016f, 0.15f, 0.9f, 0.28f),
+                new LittlePersonArchetypeMaster(4, "yellow walker", new Color(1f, 0.95f, 0.45f, 1f), 0.017f, 0.135f, 0.72f, 0.42f)
             };
 
             var behaviorProfiles = new[]

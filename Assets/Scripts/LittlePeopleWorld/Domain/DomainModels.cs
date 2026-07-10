@@ -2001,7 +2001,7 @@ namespace LittlePeopleWorld.Domain
 
             for (var i = 0; i < preset.InitialLittlePersonCount; i++)
             {
-                var archetypeId = 1 + i % 3;
+                var archetypeId = 1 + i % 4;
                 var edgeProgress = (float)random.NextDouble();
                 var edgeDirection = random.NextDouble() < 0.5 ? -1 : 1;
                 world.littlePeople.Add(new LittlePerson(

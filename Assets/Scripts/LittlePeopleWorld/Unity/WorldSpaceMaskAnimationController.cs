@@ -23,7 +23,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] int minBlobPixels = 40;
 
         [Header("Particles")]
-        [SerializeField] int particleCount = 160;
+        [SerializeField] int particleCount = 80;
         [SerializeField] float particleSize = 0.10f;
         [SerializeField] float speedPxPerSec = 55f;
         [SerializeField] float steerLerp = 6f;
