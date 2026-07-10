@@ -107,6 +107,10 @@ namespace LittlePeopleWorld.Unity
         [SerializeField, Range(0f, 1f)] float plantLeafAlpha = 0.82f;
         [SerializeField, Range(0f, 1f)] float plantLeafVeinAlpha = 0.62f;
 
+        [Header("Little Person Leaf Hang")]
+        [SerializeField] float leafTouchMaskRadiusPx = 8f;
+        [SerializeField] float leafHangOffsetPx = 3f;
+
         [Header("Bloom Attraction")]
         [SerializeField] float bloomAttractRadiusRatio = 0.5f;
         [SerializeField] float bloomSphereRadiusRatio = 1.0f;
@@ -205,6 +209,143 @@ namespace LittlePeopleWorld.Unity
             }
 
             return found;
+        }
+
+        public void PrepareSpatialQueries(NormalizedScreenMapper screenMapper)
+        {
+            if (screenMapper == null)
+            {
+                return;
+            }
+
+            mapper = screenMapper;
+            EnsureRuntime();
+        }
+
+        public bool TryGetNearestLeafHangTarget(
+            Vector3 worldPosition,
+            float searchRadiusWorld,
+            IReadOnlyList<InteractionObject> interactionObjects,
+            bool hasDevelopmentTouch,
+            Vector3 developmentTouchWorldPosition,
+            out Vector3 hangWorldPosition,
+            out bool hangLeft)
+        {
+            hangWorldPosition = default;
+            hangLeft = false;
+            if (mapper == null || plants.Count == 0 || searchRadiusWorld <= 0f)
+            {
+                return false;
+            }
+
+            var worldUnitsPerMaskPx = mapper.WorldHeight / Mathf.Max(1f, MaskH - 1f);
+            var touchRadiusWorld = Mathf.Max(0.01f, leafTouchMaskRadiusPx * worldUnitsPerMaskPx);
+            var searchRadiusSqr = searchRadiusWorld * searchRadiusWorld;
+            var bestDistanceSqr = searchRadiusSqr;
+            var found = false;
+
+            foreach (var plant in plants)
+            {
+                if (plant.CurrentStage == PlantStage.Dead || plant.HeightPx <= 2f)
+                {
+                    continue;
+                }
+
+                var rootWorldPosition = MaskToWorld(plant.Position);
+                var bloomWorldPosition = MaskToWorld(plant.BloomPosition);
+                var bloomLocalPosition = bloomWorldPosition - rootWorldPosition;
+                for (var i = 0; i < Mathf.Max(0, plantLeafCount); i++)
+                {
+                    if (!TryGetLeafTargetInfo(
+                            i,
+                            plantLeafCount,
+                            bloomLocalPosition,
+                            worldUnitsPerMaskPx,
+                            plantLeafLengthPx,
+                            plantLeafWidthPx,
+                            plantLeafStartRatio,
+                            plantLeafEndRatio,
+                            plantLeafAngleDegrees,
+                            out var leaf))
+                    {
+                        continue;
+                    }
+
+                    var candidate = rootWorldPosition +
+                                    leaf.LocalPosition +
+                                    leaf.Direction * leaf.LengthWorld * leaf.Scale * 0.48f +
+                                    Vector3.down * Mathf.Max(0f, leafHangOffsetPx) * worldUnitsPerMaskPx;
+                    var distanceSqr = (worldPosition - candidate).sqrMagnitude;
+                    if (distanceSqr > bestDistanceSqr)
+                    {
+                        continue;
+                    }
+
+                    var touchedByInput = IsInputNearWorldPosition(interactionObjects, candidate, touchRadiusWorld);
+                    var touchedByDevelopmentClick =
+                        hasDevelopmentTouch &&
+                        (developmentTouchWorldPosition - candidate).sqrMagnitude <= touchRadiusWorld * touchRadiusWorld;
+                    if (!touchedByInput && !touchedByDevelopmentClick)
+                    {
+                        continue;
+                    }
+
+                    bestDistanceSqr = distanceSqr;
+                    hangWorldPosition = candidate;
+                    hangLeft = worldPosition.x < candidate.x;
+                    found = true;
+                }
+            }
+
+            return found;
+        }
+
+        public bool IsInputNearWorldPosition(
+            IReadOnlyList<InteractionObject> interactionObjects,
+            Vector3 worldPosition,
+            float radiusWorld)
+        {
+            if (mapper == null || interactionObjects == null || interactionObjects.Count == 0 || radiusWorld <= 0f)
+            {
+                return false;
+            }
+
+            var pointPx = WorldToMaskPx(worldPosition);
+            var radiusPx = WorldRadiusToMaskRadius(radiusWorld);
+            foreach (var interactionObject in interactionObjects)
+            {
+                if (interactionObject == null)
+                {
+                    continue;
+                }
+
+                if (interactionObject.ShapeKind == InteractionShapeKind.Contour &&
+                    interactionObject.ContourPoints.Count >= 3)
+                {
+                    var polygon = new Vector2[interactionObject.ContourPoints.Count];
+                    for (var i = 0; i < polygon.Length; i++)
+                    {
+                        polygon[i] = NormalizedToMaskPx(interactionObject.ContourPoints[i]);
+                    }
+
+                    if (DistancePointToPolygon(polygon, pointPx) <= radiusPx)
+                    {
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                var objectWorldPosition = mapper.ToWorld(interactionObject.Position);
+                var objectRadius = mapper.ToWorldRadius(Mathf.Max(interactionObject.Size.x, interactionObject.Size.y) * 0.5f);
+                if ((objectWorldPosition - worldPosition).sqrMagnitude <=
+                    (radiusWorld + objectRadius) * (radiusWorld + objectRadius))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         static Vector3 ClosestPointOnSegment(Vector3 point, Vector3 a, Vector3 b)
@@ -1632,6 +1773,17 @@ namespace LittlePeopleWorld.Unity
                 (1f - Mathf.Clamp01(normalized.y)) * (MaskH - 1));
         }
 
+        Vector2 WorldToMaskPx(Vector3 worldPosition)
+        {
+            return NormalizedToMaskPx(mapper.ToNormalized(worldPosition));
+        }
+
+        float WorldRadiusToMaskRadius(float worldRadius)
+        {
+            var worldUnitsPerMaskPx = mapper.WorldHeight / Mathf.Max(1f, MaskH - 1f);
+            return Mathf.Max(0.5f, worldRadius / Mathf.Max(0.0001f, worldUnitsPerMaskPx));
+        }
+
         Vector2 MaskPxToNormalized(Vector2 maskPx)
         {
             return new Vector2(
@@ -1703,6 +1855,65 @@ namespace LittlePeopleWorld.Unity
             Blooming,
             Wilting,
             Dead
+        }
+
+        readonly struct LeafTargetInfo
+        {
+            public readonly Vector3 LocalPosition;
+            public readonly Vector3 Direction;
+            public readonly float LengthWorld;
+            public readonly float WidthWorld;
+            public readonly float Scale;
+
+            public LeafTargetInfo(Vector3 localPosition, Vector3 direction, float lengthWorld, float widthWorld, float scale)
+            {
+                LocalPosition = localPosition;
+                Direction = direction;
+                LengthWorld = lengthWorld;
+                WidthWorld = widthWorld;
+                Scale = scale;
+            }
+        }
+
+        static bool TryGetLeafTargetInfo(
+            int index,
+            int leafCount,
+            Vector3 bloomLocalPosition,
+            float worldUnitsPerMaskPx,
+            float leafLengthPx,
+            float leafWidthPx,
+            float leafStartRatio,
+            float leafEndRatio,
+            float leafAngleDegrees,
+            out LeafTargetInfo leaf)
+        {
+            leaf = default;
+            var count = Mathf.Max(0, leafCount);
+            var stemLength = bloomLocalPosition.magnitude;
+            if (index < 0 || index >= count || stemLength <= 0.0005f)
+            {
+                return false;
+            }
+
+            var stemDirection = bloomLocalPosition.normalized;
+            var start = Mathf.Clamp01(Mathf.Min(leafStartRatio, leafEndRatio));
+            var end = Mathf.Clamp01(Mathf.Max(leafStartRatio, leafEndRatio));
+            var leafLengthWorld = Mathf.Max(0.004f, leafLengthPx * worldUnitsPerMaskPx);
+            var leafWidthWorld = Mathf.Max(0.002f, leafWidthPx * worldUnitsPerMaskPx);
+            var growthScale = Mathf.Clamp01(stemLength / Mathf.Max(0.0005f, leafLengthWorld * 2.2f));
+            if (growthScale <= 0.05f)
+            {
+                return false;
+            }
+
+            var ratio = count == 1 ? 0.5f : Mathf.Lerp(start, end, (float)index / (count - 1));
+            var side = index % 2 == 0 ? -1f : 1f;
+            var localPosition = bloomLocalPosition * ratio;
+            var leafDirection = Quaternion.AngleAxis(leafAngleDegrees * side, Vector3.forward) * stemDirection;
+            var phaseScale = Mathf.Lerp(0.72f, 1f, Mathf.Clamp01((ratio - start + 0.08f) / Mathf.Max(0.01f, end - start + 0.08f)));
+            var leafScale = growthScale * phaseScale;
+            leaf = new LeafTargetInfo(localPosition, leafDirection, leafLengthWorld, leafWidthWorld, leafScale);
+            return true;
         }
 
         sealed class PlantModel
@@ -1918,12 +2129,8 @@ namespace LittlePeopleWorld.Unity
 
                 var stemLength = bloomLocalPosition.magnitude;
                 var canShowLeaves = count > 0 && stemLength > 0.0005f;
-                var stemDirection = canShowLeaves ? bloomLocalPosition.normalized : Vector3.up;
-                var start = Mathf.Clamp01(Mathf.Min(leafStartRatio, leafEndRatio));
-                var end = Mathf.Clamp01(Mathf.Max(leafStartRatio, leafEndRatio));
-                var leafLengthWorld = Mathf.Max(0.004f, leafLengthPx * worldUnitsPerMaskPx);
-                var leafWidthWorld = Mathf.Max(0.002f, leafWidthPx * worldUnitsPerMaskPx);
-                var growthScale = Mathf.Clamp01(stemLength / Mathf.Max(0.0005f, leafLengthWorld * 2.2f));
+                var baseLeafLengthWorld = Mathf.Max(0.004f, leafLengthPx * worldUnitsPerMaskPx);
+                var growthScale = Mathf.Clamp01(stemLength / Mathf.Max(0.0005f, baseLeafLengthWorld * 2.2f));
 
                 for (var i = 0; i < leafRenderers.Count; i++)
                 {
@@ -1937,29 +2144,45 @@ namespace LittlePeopleWorld.Unity
                         continue;
                     }
 
-                    var ratio = count == 1 ? 0.5f : Mathf.Lerp(start, end, (float)i / (count - 1));
-                    var side = i % 2 == 0 ? -1f : 1f;
-                    var localPosition = bloomLocalPosition * ratio;
-                    var leafDirection = Quaternion.AngleAxis(leafAngleDegrees * side, Vector3.forward) * stemDirection;
+                    if (!TryGetLeafTargetInfo(
+                            i,
+                            count,
+                            bloomLocalPosition,
+                            worldUnitsPerMaskPx,
+                            leafLengthPx,
+                            leafWidthPx,
+                            leafStartRatio,
+                            leafEndRatio,
+                            leafAngleDegrees,
+                            out var leaf))
+                    {
+                        leafRenderer.enabled = false;
+                        veinRenderer.enabled = false;
+                        continue;
+                    }
+
+                    var localPosition = leaf.LocalPosition;
+                    var leafDirection = leaf.Direction;
                     var leafRotation = Quaternion.FromToRotation(Vector3.up, leafDirection);
-                    var phaseScale = Mathf.Lerp(0.72f, 1f, Mathf.Clamp01((ratio - start + 0.08f) / Mathf.Max(0.01f, end - start + 0.08f)));
-                    var leafScale = growthScale * phaseScale;
+                    var renderLeafLengthWorld = leaf.LengthWorld;
+                    var renderLeafWidthWorld = leaf.WidthWorld;
+                    var leafScale = leaf.Scale;
 
                     var leafColor = Color.Lerp(new Color(0.24f, 0.76f, 0.34f, leafAlpha), new Color(0.55f, 0.44f, 0.24f, leafAlpha * 0.66f), wilt);
                     leafColor = Color.Lerp(leafColor, Color.white, i % 2 == 0 ? 0.05f : 0.12f);
                     leafColor.a = Mathf.Lerp(leafAlpha, leafAlpha * 0.52f, wilt);
 
                     leafRenderer.transform.localPosition = localPosition;
-                    leafRenderer.transform.localScale = new Vector3(leafWidthWorld * leafScale, leafLengthWorld * leafScale, 1f);
+                    leafRenderer.transform.localScale = new Vector3(renderLeafWidthWorld * leafScale, renderLeafLengthWorld * leafScale, 1f);
                     leafRenderer.transform.localRotation = leafRotation;
                     leafRenderer.color = leafColor;
 
                     var veinColor = Color.Lerp(new Color(0.78f, 1f, 0.58f, leafVeinAlpha), stemColor, 0.25f);
                     veinColor.a = Mathf.Lerp(leafVeinAlpha, leafVeinAlpha * 0.25f, wilt);
-                    veinRenderer.transform.localPosition = localPosition + leafDirection * leafLengthWorld * leafScale * 0.38f;
+                    veinRenderer.transform.localPosition = localPosition + leafDirection * renderLeafLengthWorld * leafScale * 0.38f;
                     veinRenderer.transform.localScale = new Vector3(
-                        Mathf.Max(0.001f, leafWidthWorld * 0.08f * leafScale),
-                        Mathf.Max(0.002f, leafLengthWorld * 0.58f * leafScale),
+                        Mathf.Max(0.001f, renderLeafWidthWorld * 0.08f * leafScale),
+                        Mathf.Max(0.002f, renderLeafLengthWorld * 0.58f * leafScale),
                         1f);
                     veinRenderer.transform.localRotation = leafRotation;
                     veinRenderer.color = veinColor;

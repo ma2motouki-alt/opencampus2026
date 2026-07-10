@@ -23,16 +23,40 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] Vector2 plantLookDurationSeconds = new Vector2(1f, 12f);
         [SerializeField] float plantLookCooldownSeconds = 2.0f;
 
+        [Header("Leaf Hang")]
+        [SerializeField] Vector2 leafHangDurationSeconds = new Vector2(1.2f, 2.2f);
+        [SerializeField] float leafHangCooldownSeconds = 2.5f;
+        [SerializeField] float leafHangFrameSeconds = 0.18f;
+        [SerializeField] float leafHangSpriteDownOffsetRatio = 0.72f;
+        [SerializeField] float leafDropDurationSeconds = 0.45f;
+        [SerializeField] float leafDropArcHeightWorld = 0.35f;
+        [SerializeField] float leafDropRetouchArmSeconds = 0.2f;
+
         SpriteRenderer glowRenderer;
         SpriteRenderer spriteRenderer;
         float animationSeed;
         float plantLookTimer;
         float plantLookCooldownTimer;
         bool plantLookLeft;
+        float leafHangTimer;
+        float leafHangCooldownTimer;
+        bool leafHangLeft;
+        Vector3 leafHangWorldPosition;
+        float leafDropTimer;
+        Vector3 leafDropStartWorldPosition;
+        Vector3 leafDropEndWorldPosition;
+        float leafDropRetouchTimer;
+        bool leafDropTouchWasPresent;
 
         static readonly Dictionary<int, SpriteSet> spriteCache = new();
 
         public bool IsLookingAtPlant => plantLookTimer > 0f;
+        public bool IsHangingFromLeaf => leafHangTimer > 0f;
+        public bool IsDroppingFromLeaf => leafDropTimer > 0f;
+        public bool IsPlantInteractionLocked => IsLookingAtPlant || IsHangingFromLeaf || IsDroppingFromLeaf;
+        public Vector3 LeafInteractionWorldPosition => IsDroppingFromLeaf
+            ? LeafDropWorldPosition()
+            : IsHangingFromLeaf ? leafHangWorldPosition : transform.position;
 
         public void Initialize()
         {
@@ -46,32 +70,54 @@ namespace LittlePeopleWorld.Unity
             LittlePersonArchetypeMaster archetype,
             NormalizedScreenMapper mapper,
             bool plantLookCandidate = false,
-            Vector3 plantLookTargetWorld = default)
+            Vector3 plantLookTargetWorld = default,
+            bool leafHangCandidate = false,
+            Vector3 leafHangTargetWorld = default,
+            bool leafHangLeftCandidate = false,
+            bool leafDropTouched = false)
         {
             var baseWorldPosition = mapper.ToWorld(person.Position) + EdgeVisualOffset(person, mapper);
-            transform.position = baseWorldPosition;
-
             var unit = mapper.ToWorldRadius(archetype.Size);
             var targetHeight = Mathf.Max(0.001f, unit * spriteHeightMultiplier);
-            AdvancePlantLook(person, baseWorldPosition, plantLookCandidate, plantLookTargetWorld);
+            AdvancePlantInteraction(
+                person,
+                baseWorldPosition,
+                plantLookCandidate,
+                plantLookTargetWorld,
+                leafHangCandidate,
+                leafHangTargetWorld,
+                leafHangLeftCandidate,
+                leafDropTouched);
+
+            var isDroppingFromLeaf = leafDropTimer > 0f;
+            var isHangingFromLeaf = leafHangTimer > 0f;
+            var isLookingAtPlant = plantLookTimer > 0f && !isHangingFromLeaf && !isDroppingFromLeaf;
+            transform.position = isDroppingFromLeaf
+                ? LeafDropWorldPosition()
+                : isHangingFromLeaf ? leafHangWorldPosition : baseWorldPosition;
 
             var sprites = GetSpriteSet(archetype.Id);
-            var isLookingAtPlant = plantLookTimer > 0f;
-            var sprite = isLookingAtPlant
-                ? (plantLookLeft ? sprites.LookLeft : sprites.LookRight)
-                : sprites.WalkFrame(CurrentFrameIndex(person), ShouldAnimate(person));
+            var sprite = isDroppingFromLeaf || isHangingFromLeaf
+                ? sprites.HangFrame(CurrentLeafHangFrameIndex(), leafHangLeft)
+                : isLookingAtPlant
+                    ? (plantLookLeft ? sprites.LookLeft : sprites.LookRight)
+                    : sprites.WalkFrame(CurrentFrameIndex(person), ShouldAnimate(person));
             var hasSprite = sprite != null;
 
             spriteRenderer.sprite = hasSprite ? sprite : RuntimeSpriteFactory.Circle;
             spriteRenderer.color = hasSprite ? Color.white : archetype.BodyColor;
-            spriteRenderer.flipX = !isLookingAtPlant && flipAlongMovement && ShouldFlipX(person);
+            spriteRenderer.flipX = !isLookingAtPlant && !isHangingFromLeaf && !isDroppingFromLeaf && flipAlongMovement && ShouldFlipX(person);
 
             var pulse = person.Emotion == LittlePersonEmotion.Startled
                 ? 1f + startledPulseScale * (0.5f + 0.5f * Mathf.Sin((Time.time + animationSeed) * 14f))
                 : 1f;
             var spriteScale = hasSprite ? ScaleForTargetHeight(spriteRenderer.sprite, targetHeight) : unit;
-            spriteRenderer.transform.localPosition = Vector3.zero;
-            spriteRenderer.transform.localRotation = Quaternion.identity;
+            spriteRenderer.transform.localPosition = isHangingFromLeaf || isDroppingFromLeaf
+                ? new Vector3(0f, -targetHeight * leafHangSpriteDownOffsetRatio, 0f)
+                : Vector3.zero;
+            spriteRenderer.transform.localRotation = isDroppingFromLeaf
+                ? Quaternion.Euler(0f, 0f, Mathf.Sin(Time.time * 10f + animationSeed) * fallingSpinDegrees)
+                : Quaternion.identity;
             spriteRenderer.transform.localScale = Vector3.one * spriteScale * pulse;
 
             var glowColor = GlowColor(person, archetype.BodyColor);
@@ -83,21 +129,76 @@ namespace LittlePeopleWorld.Unity
             glowRenderer.transform.localRotation = Quaternion.identity;
             glowRenderer.transform.localScale = Vector3.one * unit * GlowScale(person);
 
-            transform.rotation = Quaternion.Euler(0f, 0f, RotationDegrees(person));
+            transform.rotation = isHangingFromLeaf || isDroppingFromLeaf
+                ? Quaternion.identity
+                : Quaternion.Euler(0f, 0f, RotationDegrees(person));
         }
 
-        void AdvancePlantLook(
+        void AdvancePlantInteraction(
             LittlePerson person,
             Vector3 baseWorldPosition,
             bool plantLookCandidate,
-            Vector3 plantLookTargetWorld)
+            Vector3 plantLookTargetWorld,
+            bool leafHangCandidate,
+            Vector3 leafHangTargetWorld,
+            bool leafHangLeftCandidate,
+            bool leafDropTouched)
         {
             var deltaTime = Mathf.Max(0f, Time.deltaTime);
+            leafHangCooldownTimer = Mathf.Max(0f, leafHangCooldownTimer - deltaTime);
+
+            if (leafDropTimer > 0f)
+            {
+                leafDropTimer = Mathf.Max(0f, leafDropTimer - deltaTime);
+                if (leafDropTimer <= 0f)
+                {
+                    leafHangCooldownTimer = leafHangCooldownSeconds;
+                }
+
+                return;
+            }
+
+            if (leafHangTimer > 0f)
+            {
+                plantLookTimer = 0f;
+                leafDropRetouchTimer = Mathf.Max(0f, leafDropRetouchTimer - deltaTime);
+                if (!leafDropTouched)
+                {
+                    leafDropTouchWasPresent = false;
+                }
+
+                if (leafDropTouched && !leafDropTouchWasPresent && leafDropRetouchTimer <= 0f)
+                {
+                    leafDropTouchWasPresent = true;
+                    StartLeafDrop(baseWorldPosition);
+                    return;
+                }
+
+                leafDropTouchWasPresent = leafDropTouched;
+
+                leafHangTimer = Mathf.Max(0f, leafHangTimer - deltaTime);
+                if (leafHangTimer <= 0f)
+                {
+                    leafHangCooldownTimer = leafHangCooldownSeconds;
+                }
+
+                return;
+            }
+
             plantLookTimer = Mathf.Max(0f, plantLookTimer - deltaTime);
             plantLookCooldownTimer = Mathf.Max(0f, plantLookCooldownTimer - deltaTime);
 
-            if (plantLookTimer > 0f ||
-                plantLookCooldownTimer > 0f ||
+            if (plantLookTimer > 0f)
+            {
+                if (leafHangCandidate && leafHangCooldownTimer <= 0f)
+                {
+                    StartLeafHang(leafHangTargetWorld, leafHangLeftCandidate);
+                }
+
+                return;
+            }
+
+            if (plantLookCooldownTimer > 0f ||
                 !plantLookCandidate ||
                 person.CurrentBehavior != LittlePersonBehaviorKind.EdgeWalk)
             {
@@ -117,6 +218,38 @@ namespace LittlePeopleWorld.Unity
             plantLookCooldownTimer = plantLookCooldownSeconds;
         }
 
+        void StartLeafHang(Vector3 targetWorldPosition, bool useLeftSprite)
+        {
+            leafHangWorldPosition = targetWorldPosition;
+            leafHangLeft = useLeftSprite;
+            var minDuration = Mathf.Max(0.05f, Mathf.Min(leafHangDurationSeconds.x, leafHangDurationSeconds.y));
+            var maxDuration = Mathf.Max(minDuration, Mathf.Max(leafHangDurationSeconds.x, leafHangDurationSeconds.y));
+            leafHangTimer = Random.Range(minDuration, maxDuration);
+            leafDropTimer = 0f;
+            plantLookTimer = 0f;
+            leafDropRetouchTimer = Mathf.Max(0f, leafDropRetouchArmSeconds);
+            leafDropTouchWasPresent = true;
+        }
+
+        void StartLeafDrop(Vector3 endWorldPosition)
+        {
+            leafDropStartWorldPosition = leafHangWorldPosition;
+            leafDropEndWorldPosition = endWorldPosition;
+            leafDropTimer = Mathf.Max(0.05f, leafDropDurationSeconds);
+            leafHangTimer = 0f;
+            plantLookTimer = 0f;
+            leafDropTouchWasPresent = false;
+        }
+
+        Vector3 LeafDropWorldPosition()
+        {
+            var duration = Mathf.Max(0.05f, leafDropDurationSeconds);
+            var progress = 1f - Mathf.Clamp01(leafDropTimer / duration);
+            var eased = progress * progress * (3f - 2f * progress);
+            var arc = Mathf.Sin(progress * Mathf.PI) * leafDropArcHeightWorld;
+            return Vector3.Lerp(leafDropStartWorldPosition, leafDropEndWorldPosition, eased) + Vector3.up * arc;
+        }
+
         static bool IsLookingFromWorldLeft(Vector3 baseWorldPosition, Vector3 targetWorldPosition)
         {
             return baseWorldPosition.x < targetWorldPosition.x;
@@ -127,6 +260,12 @@ namespace LittlePeopleWorld.Unity
             var offset = (person.PreferenceSeed & 0xffff) * 0.001f + animationSeed;
             var safeFrameSeconds = Mathf.Max(0.03f, frameSeconds);
             return Mathf.FloorToInt((Time.time + offset) / safeFrameSeconds) % 2;
+        }
+
+        int CurrentLeafHangFrameIndex()
+        {
+            var safeFrameSeconds = Mathf.Max(0.03f, leafHangFrameSeconds);
+            return Mathf.FloorToInt((Time.time + animationSeed) / safeFrameSeconds) % 2;
         }
 
         bool ShouldAnimate(LittlePerson person)
@@ -271,7 +410,13 @@ namespace LittlePeopleWorld.Unity
                 LoadSprite($"{prefix}1"),
                 LoadSprite($"{prefix}2"),
                 LoadSprite($"{prefix}_up_left"),
-                LoadSprite($"{prefix}_up_right"));
+                LoadSprite($"{prefix}_up_right"),
+                LoadSprite($"{prefix}_hang1_left"),
+                LoadSprite($"{prefix}_hang2_left"),
+                LoadSprite($"{prefix}_hang1_right"),
+                LoadSprite($"{prefix}_hang2_right"),
+                LoadSprite($"{prefix}_hang1"),
+                LoadSprite($"{prefix}_hang2"));
             spriteCache.Add(archetypeId, sprites);
             return sprites;
         }
@@ -279,6 +424,13 @@ namespace LittlePeopleWorld.Unity
         static Sprite LoadSprite(string resourceName)
         {
             var texture = Resources.Load<Texture2D>(ResourceRoot + resourceName);
+#if UNITY_EDITOR
+            if (texture == null)
+            {
+                texture = UnityEditor.AssetDatabase.LoadAssetAtPath<Texture2D>($"Assets/Art/People/{resourceName}.png");
+            }
+#endif
+
             if (texture == null)
             {
                 return null;
@@ -324,15 +476,33 @@ namespace LittlePeopleWorld.Unity
         {
             readonly Sprite walkA;
             readonly Sprite walkB;
+            readonly Sprite hangLeftA;
+            readonly Sprite hangLeftB;
+            readonly Sprite hangRightA;
+            readonly Sprite hangRightB;
             public readonly Sprite LookLeft;
             public readonly Sprite LookRight;
 
-            public SpriteSet(Sprite walkA, Sprite walkB, Sprite lookLeft, Sprite lookRight)
+            public SpriteSet(
+                Sprite walkA,
+                Sprite walkB,
+                Sprite lookLeft,
+                Sprite lookRight,
+                Sprite hangLeftA,
+                Sprite hangLeftB,
+                Sprite hangRightA,
+                Sprite hangRightB,
+                Sprite hangAnyA,
+                Sprite hangAnyB)
             {
                 this.walkA = walkA;
                 this.walkB = walkB;
                 LookLeft = lookLeft != null ? lookLeft : walkA;
                 LookRight = lookRight != null ? lookRight : walkA;
+                this.hangLeftA = hangLeftA != null ? hangLeftA : hangAnyA != null ? hangAnyA : LookLeft;
+                this.hangLeftB = hangLeftB != null ? hangLeftB : hangAnyB != null ? hangAnyB : this.hangLeftA;
+                this.hangRightA = hangRightA != null ? hangRightA : hangAnyA != null ? hangAnyA : LookRight;
+                this.hangRightB = hangRightB != null ? hangRightB : hangAnyB != null ? hangAnyB : this.hangRightA;
             }
 
             public Sprite WalkFrame(int frameIndex, bool animate)
@@ -345,6 +515,15 @@ namespace LittlePeopleWorld.Unity
                 return frameIndex % 2 == 0
                     ? walkA != null ? walkA : walkB
                     : walkB != null ? walkB : walkA;
+            }
+
+            public Sprite HangFrame(int frameIndex, bool left)
+            {
+                var frameA = left ? hangLeftA : hangRightA;
+                var frameB = left ? hangLeftB : hangRightB;
+                return frameIndex % 2 == 0
+                    ? frameA != null ? frameA : frameB
+                    : frameB != null ? frameB : frameA;
             }
         }
 

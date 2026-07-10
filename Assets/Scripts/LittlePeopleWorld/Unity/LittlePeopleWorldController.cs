@@ -30,6 +30,11 @@ namespace LittlePeopleWorld.Unity
         [Header("Little Person Plant Look")]
         [SerializeField] bool enableLittlePersonPlantLook = true;
         [SerializeField] float littlePersonPlantLookRadius = 0.95f;
+        [Header("Little Person Leaf Hang")]
+        [SerializeField] bool enableLittlePersonLeafHang = true;
+        [SerializeField] float littlePersonLeafHangRadius = 1.0f;
+        [SerializeField] float littlePersonLeafDropTouchRadius = 0.45f;
+        [SerializeField] bool enableDevelopmentLeafHangClick = true;
         [Header("Development Rain")]
         [SerializeField] bool enableDevelopmentClickRain = true;
         [SerializeField] float developmentRainDurationSeconds = 2.0f;
@@ -101,7 +106,7 @@ namespace LittlePeopleWorld.Unity
                 return;
             }
 
-            if (!UnityEngine.Input.GetMouseButtonDown(1))
+            if (!UnityEngine.Input.GetMouseButtonDown(1) || IsDevelopmentLeafHangClick())
             {
                 return;
             }
@@ -134,7 +139,7 @@ namespace LittlePeopleWorld.Unity
                 $"Input: {InputProviderLabel()}\n" +
                 "1 Hand  2 Round  3 Bar\n" +
                 "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
-                "Right click: development rain\n" +
+                "Right click: development rain  Shift+Right click: leaf hang/drop debug\n" +
                 $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}";
 
             var rainOcclusionDebugText = maskAnimationController != null
@@ -326,21 +331,55 @@ namespace LittlePeopleWorld.Unity
         {
             plantLookPausedPersonIds.Clear();
 
+            if (maskAnimationController != null)
+            {
+                maskAnimationController.PrepareSpatialQueries(mapper);
+            }
+
+            var hasDevelopmentLeafTouch = TryGetDevelopmentLeafTouchWorldPosition(out var developmentLeafTouchWorldPosition);
             for (var i = 0; i < world.LittlePeople.Count && i < littlePersonViews.Count; i++)
             {
                 var person = world.LittlePeople[i];
                 var archetype = masters.LittlePersonArchetypes.Get(person.ArchetypeId);
+                var personWorldPosition = mapper.ToWorld(person.Position);
                 var plantLookTargetWorld = Vector3.zero;
                 var hasPlantLookTarget =
                     enableLittlePersonPlantLook &&
                     maskAnimationController != null &&
                     maskAnimationController.TryGetNearestPlantLookTarget(
-                        mapper.ToWorld(person.Position),
+                        personWorldPosition,
                         littlePersonPlantLookRadius,
                         out plantLookTargetWorld);
                 var view = littlePersonViews[i];
-                view.Render(person, archetype, mapper, hasPlantLookTarget, plantLookTargetWorld);
-                if (view.IsLookingAtPlant)
+                var leafHangTargetWorld = Vector3.zero;
+                var leafHangLeft = false;
+                var hasLeafHangTarget =
+                    enableLittlePersonLeafHang &&
+                    view.IsLookingAtPlant &&
+                    maskAnimationController != null &&
+                    maskAnimationController.TryGetNearestLeafHangTarget(
+                        personWorldPosition,
+                        littlePersonLeafHangRadius,
+                        world.InteractionObjects,
+                        hasDevelopmentLeafTouch,
+                        developmentLeafTouchWorldPosition,
+                        out leafHangTargetWorld,
+                        out leafHangLeft);
+                var leafDropTouched =
+                    enableLittlePersonLeafHang &&
+                    view.IsHangingFromLeaf &&
+                    IsLeafDropTouched(view.LeafInteractionWorldPosition, hasDevelopmentLeafTouch, developmentLeafTouchWorldPosition);
+                view.Render(
+                    person,
+                    archetype,
+                    mapper,
+                    hasPlantLookTarget,
+                    plantLookTargetWorld,
+                    hasLeafHangTarget,
+                    leafHangTargetWorld,
+                    leafHangLeft,
+                    leafDropTouched);
+                if (view.IsPlantInteractionLocked)
                 {
                     plantLookPausedPersonIds.Add(person.Id);
                 }
@@ -530,6 +569,50 @@ namespace LittlePeopleWorld.Unity
         bool IsDebugEnabled()
         {
             return InputProvider != null && InputProvider.DebugEnabled;
+        }
+
+        bool IsLeafDropTouched(Vector3 leafInteractionWorldPosition, bool hasDevelopmentTouch, Vector3 developmentTouchWorldPosition)
+        {
+            if (hasDevelopmentTouch &&
+                (developmentTouchWorldPosition - leafInteractionWorldPosition).sqrMagnitude <=
+                littlePersonLeafDropTouchRadius * littlePersonLeafDropTouchRadius)
+            {
+                return true;
+            }
+
+            return maskAnimationController != null &&
+                   maskAnimationController.IsInputNearWorldPosition(
+                       world.InteractionObjects,
+                       leafInteractionWorldPosition,
+                       littlePersonLeafDropTouchRadius);
+        }
+
+        bool TryGetDevelopmentLeafTouchWorldPosition(out Vector3 worldPosition)
+        {
+            worldPosition = default;
+            if (!enableDevelopmentLeafHangClick || !IsDevelopmentLeafHangClick() || targetCamera == null || mapper == null)
+            {
+                return false;
+            }
+
+            var mousePosition = UnityEngine.Input.mousePosition;
+            if (mousePosition.x < 0f || mousePosition.x > Screen.width ||
+                mousePosition.y < 0f || mousePosition.y > Screen.height)
+            {
+                return false;
+            }
+
+            worldPosition = targetCamera.ScreenToWorldPoint(new Vector3(
+                mousePosition.x,
+                mousePosition.y,
+                Mathf.Max(0.001f, -targetCamera.transform.position.z)));
+            return true;
+        }
+
+        static bool IsDevelopmentLeafHangClick()
+        {
+            return UnityEngine.Input.GetMouseButtonDown(1) &&
+                   (UnityEngine.Input.GetKey(KeyCode.LeftShift) || UnityEngine.Input.GetKey(KeyCode.RightShift));
         }
 
         int SelectedObjectId()
