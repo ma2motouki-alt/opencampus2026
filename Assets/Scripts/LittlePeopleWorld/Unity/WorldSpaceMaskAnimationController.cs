@@ -72,6 +72,13 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] bool enableRainPlants = true;
         [SerializeField] float rainFallSpeedPxPerSec = 40f;
         [SerializeField] float groundYPx = 3f;
+
+        [Header("Rain Occlusion")]
+        [SerializeField] bool enableRainOcclusionByMask = true;
+        [SerializeField] int rainOcclusionProbeRadiusPx = 1;
+        [SerializeField] int rainOcclusionTopPaddingPx = 1;
+        [SerializeField] bool showRainOcclusionDebug;
+
         [SerializeField] int maxPlants = 10;
         [SerializeField] float plantMaxHeightPx = 46f;
         [SerializeField] float plantStemWidthPx = 2.0f;
@@ -137,12 +144,15 @@ namespace LittlePeopleWorld.Unity
         NormalizedScreenMapper mapper;
         int effectiveWhiteCount;
         int nextPlantId = 1;
+        int rainOcclusionBlockedDropsThisFrame;
+        int rainOcclusionLandedDropsThisFrame;
 
         public bool HasActivePlants => plants.Count > 0;
 
         public int PlantSpawnSequence { get; private set; }
         public int PlantBloomSequence { get; private set; }
         public int FlowerBurstSequence { get; private set; }
+        public string RainOcclusionDebugText { get; private set; } = string.Empty;
 
         public bool HasGrowingPlants
         {
@@ -1054,11 +1064,16 @@ namespace LittlePeopleWorld.Unity
 
         void AdvanceRainPlants(World world, MasterDatabase masters, float dt)
         {
+            rainOcclusionBlockedDropsThisFrame = 0;
+            rainOcclusionLandedDropsThisFrame = 0;
+            RainOcclusionDebugText = string.Empty;
+
             if (enableRainPlants)
             {
                 UpdateRainLanding(world, masters, dt);
             }
 
+            UpdateRainOcclusionDebugText();
             UpdatePlants(dt);
         }
 
@@ -1090,7 +1105,18 @@ namespace LittlePeopleWorld.Unity
                 {
                     var widthPx = Mathf.Max(2f, effect.Size.x * MaskW * 0.45f);
                     var jitterX = UnityEngine.Random.Range(-widthPx, widthPx);
-                    OnRainLanded(new Vector2(Mathf.Clamp(rainOrigin.x + jitterX, 1f, MaskW - 2f), groundYPx));
+                    var landingPosition = new Vector2(Mathf.Clamp(rainOrigin.x + jitterX, 1f, MaskW - 2f), groundYPx);
+                    var dropOrigin = new Vector2(landingPosition.x, rainOrigin.y);
+                    if (IsRainBlockedByMask(dropOrigin, landingPosition))
+                    {
+                        rainOcclusionBlockedDropsThisFrame++;
+                    }
+                    else
+                    {
+                        OnRainLanded(landingPosition);
+                        rainOcclusionLandedDropsThisFrame++;
+                    }
+
                     landedCount++;
                 }
 
@@ -1099,6 +1125,64 @@ namespace LittlePeopleWorld.Unity
             }
 
             RemoveDeadRainSources(liveKeys);
+        }
+
+        bool IsRainBlockedByMask(Vector2 rainOriginPx, Vector2 landingPx)
+        {
+            if (!enableRainOcclusionByMask || effectiveMask == null || effectiveWhiteCount <= 0)
+            {
+                return false;
+            }
+
+            var startY = Mathf.RoundToInt(rainOriginPx.y);
+            var endY = Mathf.RoundToInt(landingPx.y);
+            var step = startY >= endY ? -1 : 1;
+            startY += step * Mathf.Max(0, rainOcclusionTopPaddingPx);
+
+            if ((step < 0 && startY < endY) || (step > 0 && startY > endY))
+            {
+                return false;
+            }
+
+            startY = Mathf.Clamp(startY, 0, MaskH - 1);
+            endY = Mathf.Clamp(endY, 0, MaskH - 1);
+
+            var centerX = Mathf.Clamp(Mathf.RoundToInt(landingPx.x), 0, MaskW - 1);
+            var probeRadius = Mathf.Max(0, rainOcclusionProbeRadiusPx);
+            var minX = Mathf.Clamp(centerX - probeRadius, 0, MaskW - 1);
+            var maxX = Mathf.Clamp(centerX + probeRadius, 0, MaskW - 1);
+
+            for (var y = startY;; y += step)
+            {
+                var row = y * MaskW;
+                for (var x = minX; x <= maxX; x++)
+                {
+                    if (effectiveMask[row + x])
+                    {
+                        return true;
+                    }
+                }
+
+                if (y == endY)
+                {
+                    break;
+                }
+            }
+
+            return false;
+        }
+
+        void UpdateRainOcclusionDebugText()
+        {
+            if (!showRainOcclusionDebug)
+            {
+                RainOcclusionDebugText = string.Empty;
+                return;
+            }
+
+            var status = enableRainOcclusionByMask ? "on" : "off";
+            RainOcclusionDebugText =
+                $"Rain Occlusion: {status}  Blocked: {rainOcclusionBlockedDropsThisFrame}  Landed: {rainOcclusionLandedDropsThisFrame}  Mask: {effectiveWhiteCount}";
         }
 
         void RemoveDeadRainSources(HashSet<int> liveKeys)

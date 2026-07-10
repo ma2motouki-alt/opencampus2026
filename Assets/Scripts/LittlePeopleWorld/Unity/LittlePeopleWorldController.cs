@@ -132,6 +132,14 @@ namespace LittlePeopleWorld.Unity
                 "Right click: development rain\n" +
                 $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}";
 
+            var rainOcclusionDebugText = maskAnimationController != null
+                ? maskAnimationController.RainOcclusionDebugText
+                : string.Empty;
+            if (!string.IsNullOrEmpty(rainOcclusionDebugText))
+            {
+                text += "\n" + rainOcclusionDebugText;
+            }
+
             var style = new GUIStyle(GUI.skin.box)
             {
                 alignment = TextAnchor.UpperLeft,
@@ -139,7 +147,16 @@ namespace LittlePeopleWorld.Unity
                 normal = { textColor = new Color(0.85f, 1f, 0.95f, 1f) }
             };
 
-            GUI.Box(new Rect(16f, 16f, 500f, 112f), text, style);
+            var lineCount = 1;
+            foreach (var character in text)
+            {
+                if (character == '\n')
+                {
+                    lineCount++;
+                }
+            }
+
+            GUI.Box(new Rect(16f, 16f, 560f, 28f + lineCount * 17f), text, style);
         }
 
         void EnsureRuntime()
