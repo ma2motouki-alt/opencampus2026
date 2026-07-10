@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using LittlePeopleWorld.Domain;
 using UnityEngine;
-
+//　起動時の設定、定義データ
 namespace LittlePeopleWorld.Master
 {
     public sealed class MasterTable<TMaster> where TMaster : class

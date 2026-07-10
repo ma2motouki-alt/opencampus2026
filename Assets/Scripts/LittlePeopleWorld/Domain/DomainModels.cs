@@ -1091,6 +1091,20 @@ namespace LittlePeopleWorld.Domain
             }
         }
 
+        public void HoldPosition(float deltaTime)
+        {
+            CurrentReaction?.Advance(deltaTime);
+            if (CurrentReaction != null && CurrentReaction.IsExpired)
+            {
+                CurrentReaction = null;
+            }
+
+            AdvanceSurfaceConnectionCooldown(deltaTime);
+            AdvanceClimbCooldown(deltaTime);
+            AdvanceEdgeBlockCooldown(deltaTime);
+            Velocity = Vector2.zero;
+        }
+
         void AdvanceEdgeWalk(
             float deltaTime,
             IReadOnlyList<InteractionField> fields,
@@ -1975,6 +1989,7 @@ namespace LittlePeopleWorld.Domain
         readonly List<PropObstacle> propObstacles = new();
         readonly List<AmbientObject> ambientObjects = new();
         readonly List<VisualEffectInstance> visualEffects = new();
+        readonly HashSet<Guid> movementPausedLittlePersonIds = new();
         int nextVisualEffectId = 1;
         int nextDevelopmentRainSourceId = -100000;
         float displayAspect = 16f / 9f;
@@ -1990,6 +2005,20 @@ namespace LittlePeopleWorld.Domain
         public void SetDisplayAspect(float aspect)
         {
             displayAspect = Mathf.Max(0.001f, aspect);
+        }
+
+        public void SetMovementPausedLittlePeople(IReadOnlyCollection<Guid> personIds)
+        {
+            movementPausedLittlePersonIds.Clear();
+            if (personIds == null)
+            {
+                return;
+            }
+
+            foreach (var personId in personIds)
+            {
+                movementPausedLittlePersonIds.Add(personId);
+            }
         }
 
         public static World Create(MasterDatabase masters, int worldPresetId)
@@ -2081,6 +2110,13 @@ namespace LittlePeopleWorld.Domain
 
             foreach (var person in littlePeople)
             {
+                if (movementPausedLittlePersonIds.Contains(person.Id) &&
+                    person.CurrentBehavior == LittlePersonBehaviorKind.EdgeWalk)
+                {
+                    person.HoldPosition(deltaTime);
+                    continue;
+                }
+
                 person.Advance(deltaTime, interactionFields, walkableSurfaces, propObstacles, littlePeople, masters, tuning);
             }
 

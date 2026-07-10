@@ -171,6 +171,55 @@ namespace LittlePeopleWorld.Unity
                 : 1f;
         }
 
+        public bool TryGetNearestPlantLookTarget(Vector3 worldPosition, float radiusWorld, out Vector3 plantWorldPosition)
+        {
+            plantWorldPosition = default;
+            if (mapper == null || plants.Count == 0 || radiusWorld <= 0f)
+            {
+                return false;
+            }
+
+            var radiusSqr = radiusWorld * radiusWorld;
+            var bestDistanceSqr = radiusSqr;
+            var found = false;
+
+            foreach (var plant in plants)
+            {
+                if (plant.CurrentStage == PlantStage.Dead || plant.HeightPx <= 2f)
+                {
+                    continue;
+                }
+
+                var rootWorldPosition = MaskToWorld(plant.Position);
+                var bloomWorldPosition = MaskToWorld(plant.BloomPosition);
+                var closestPoint = ClosestPointOnSegment(worldPosition, rootWorldPosition, bloomWorldPosition);
+                var distanceSqr = (worldPosition - closestPoint).sqrMagnitude;
+                if (distanceSqr > bestDistanceSqr)
+                {
+                    continue;
+                }
+
+                bestDistanceSqr = distanceSqr;
+                plantWorldPosition = bloomWorldPosition;
+                found = true;
+            }
+
+            return found;
+        }
+
+        static Vector3 ClosestPointOnSegment(Vector3 point, Vector3 a, Vector3 b)
+        {
+            var segment = b - a;
+            var lengthSqr = segment.sqrMagnitude;
+            if (lengthSqr <= 0.000001f)
+            {
+                return a;
+            }
+
+            var t = Mathf.Clamp01(Vector3.Dot(point - a, segment) / lengthSqr);
+            return a + segment * t;
+        }
+
         public bool HasGrowingPlants
         {
             get

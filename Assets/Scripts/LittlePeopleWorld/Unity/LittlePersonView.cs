@@ -18,11 +18,21 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float startledPulseScale = 0.12f;
         [SerializeField] float fallingSpinDegrees = 10f;
 
+        [Header("Plant Look")]
+        [SerializeField] float plantLookChancePerSecond = 0.38f;
+        [SerializeField] Vector2 plantLookDurationSeconds = new Vector2(1f, 12f);
+        [SerializeField] float plantLookCooldownSeconds = 2.0f;
+
         SpriteRenderer glowRenderer;
         SpriteRenderer spriteRenderer;
         float animationSeed;
+        float plantLookTimer;
+        float plantLookCooldownTimer;
+        bool plantLookLeft;
 
-        static readonly Dictionary<int, Sprite[]> spriteCache = new();
+        static readonly Dictionary<int, SpriteSet> spriteCache = new();
+
+        public bool IsLookingAtPlant => plantLookTimer > 0f;
 
         public void Initialize()
         {
@@ -31,20 +41,30 @@ namespace LittlePeopleWorld.Unity
             spriteRenderer = CreateRenderer("Sprite", RuntimeSpriteFactory.Circle, 11);
         }
 
-        public void Render(LittlePerson person, LittlePersonArchetypeMaster archetype, NormalizedScreenMapper mapper)
+        public void Render(
+            LittlePerson person,
+            LittlePersonArchetypeMaster archetype,
+            NormalizedScreenMapper mapper,
+            bool plantLookCandidate = false,
+            Vector3 plantLookTargetWorld = default)
         {
-            transform.position = mapper.ToWorld(person.Position) + EdgeVisualOffset(person, mapper);
+            var baseWorldPosition = mapper.ToWorld(person.Position) + EdgeVisualOffset(person, mapper);
+            transform.position = baseWorldPosition;
 
             var unit = mapper.ToWorldRadius(archetype.Size);
             var targetHeight = Mathf.Max(0.001f, unit * spriteHeightMultiplier);
+            AdvancePlantLook(person, baseWorldPosition, plantLookCandidate, plantLookTargetWorld);
+
             var sprites = GetSpriteSet(archetype.Id);
-            var hasSprite = sprites[0] != null || sprites[1] != null;
-            var frameIndex = ShouldAnimate(person) ? CurrentFrameIndex(person) : 0;
-            var sprite = sprites[frameIndex] != null ? sprites[frameIndex] : sprites[0];
+            var isLookingAtPlant = plantLookTimer > 0f;
+            var sprite = isLookingAtPlant
+                ? (plantLookLeft ? sprites.LookLeft : sprites.LookRight)
+                : sprites.WalkFrame(CurrentFrameIndex(person), ShouldAnimate(person));
+            var hasSprite = sprite != null;
 
             spriteRenderer.sprite = hasSprite ? sprite : RuntimeSpriteFactory.Circle;
             spriteRenderer.color = hasSprite ? Color.white : archetype.BodyColor;
-            spriteRenderer.flipX = flipAlongMovement && ShouldFlipX(person);
+            spriteRenderer.flipX = !isLookingAtPlant && flipAlongMovement && ShouldFlipX(person);
 
             var pulse = person.Emotion == LittlePersonEmotion.Startled
                 ? 1f + startledPulseScale * (0.5f + 0.5f * Mathf.Sin((Time.time + animationSeed) * 14f))
@@ -64,6 +84,42 @@ namespace LittlePeopleWorld.Unity
             glowRenderer.transform.localScale = Vector3.one * unit * GlowScale(person);
 
             transform.rotation = Quaternion.Euler(0f, 0f, RotationDegrees(person));
+        }
+
+        void AdvancePlantLook(
+            LittlePerson person,
+            Vector3 baseWorldPosition,
+            bool plantLookCandidate,
+            Vector3 plantLookTargetWorld)
+        {
+            var deltaTime = Mathf.Max(0f, Time.deltaTime);
+            plantLookTimer = Mathf.Max(0f, plantLookTimer - deltaTime);
+            plantLookCooldownTimer = Mathf.Max(0f, plantLookCooldownTimer - deltaTime);
+
+            if (plantLookTimer > 0f ||
+                plantLookCooldownTimer > 0f ||
+                !plantLookCandidate ||
+                person.CurrentBehavior != LittlePersonBehaviorKind.EdgeWalk)
+            {
+                return;
+            }
+
+            var chance = Mathf.Max(0f, plantLookChancePerSecond) * deltaTime;
+            if (Random.value > chance)
+            {
+                return;
+            }
+
+            plantLookLeft = IsLookingFromWorldLeft(baseWorldPosition, plantLookTargetWorld);
+            var minDuration = Mathf.Max(0.05f, Mathf.Min(plantLookDurationSeconds.x, plantLookDurationSeconds.y));
+            var maxDuration = Mathf.Max(minDuration, Mathf.Max(plantLookDurationSeconds.x, plantLookDurationSeconds.y));
+            plantLookTimer = Random.Range(minDuration, maxDuration);
+            plantLookCooldownTimer = plantLookCooldownSeconds;
+        }
+
+        static bool IsLookingFromWorldLeft(Vector3 baseWorldPosition, Vector3 targetWorldPosition)
+        {
+            return baseWorldPosition.x < targetWorldPosition.x;
         }
 
         int CurrentFrameIndex(LittlePerson person)
@@ -203,7 +259,7 @@ namespace LittlePeopleWorld.Unity
             return targetHeight / sprite.bounds.size.y;
         }
 
-        static Sprite[] GetSpriteSet(int archetypeId)
+        static SpriteSet GetSpriteSet(int archetypeId)
         {
             if (spriteCache.TryGetValue(archetypeId, out var sprites))
             {
@@ -211,11 +267,11 @@ namespace LittlePeopleWorld.Unity
             }
 
             var prefix = SpritePrefix(archetypeId);
-            sprites = new[]
-            {
+            sprites = new SpriteSet(
                 LoadSprite($"{prefix}1"),
-                LoadSprite($"{prefix}2")
-            };
+                LoadSprite($"{prefix}2"),
+                LoadSprite($"{prefix}_up_left"),
+                LoadSprite($"{prefix}_up_right"));
             spriteCache.Add(archetypeId, sprites);
             return sprites;
         }
@@ -262,6 +318,34 @@ namespace LittlePeopleWorld.Unity
             renderer.sprite = sprite;
             renderer.sortingOrder = sortingOrder;
             return renderer;
+        }
+
+        sealed class SpriteSet
+        {
+            readonly Sprite walkA;
+            readonly Sprite walkB;
+            public readonly Sprite LookLeft;
+            public readonly Sprite LookRight;
+
+            public SpriteSet(Sprite walkA, Sprite walkB, Sprite lookLeft, Sprite lookRight)
+            {
+                this.walkA = walkA;
+                this.walkB = walkB;
+                LookLeft = lookLeft != null ? lookLeft : walkA;
+                LookRight = lookRight != null ? lookRight : walkA;
+            }
+
+            public Sprite WalkFrame(int frameIndex, bool animate)
+            {
+                if (!animate)
+                {
+                    return walkA != null ? walkA : walkB;
+                }
+
+                return frameIndex % 2 == 0
+                    ? walkA != null ? walkA : walkB
+                    : walkB != null ? walkB : walkA;
+            }
         }
 
         static Color GlowColor(LittlePerson person, Color fallback)

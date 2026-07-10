@@ -27,6 +27,9 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] WorldSpaceMaskAnimationController maskAnimationController;
         [SerializeField] bool enableAudioLayers = true;
         [SerializeField] WorldAudioController audioController;
+        [Header("Little Person Plant Look")]
+        [SerializeField] bool enableLittlePersonPlantLook = true;
+        [SerializeField] float littlePersonPlantLookRadius = 0.95f;
         [Header("Development Rain")]
         [SerializeField] bool enableDevelopmentClickRain = true;
         [SerializeField] float developmentRainDurationSeconds = 2.0f;
@@ -38,6 +41,7 @@ namespace LittlePeopleWorld.Unity
         readonly Dictionary<int, PropObstacleView> propObstacleViews = new();
         readonly Dictionary<int, AmbientObjectView> ambientObjectViews = new();
         readonly Dictionary<int, VisualEffectView> visualEffectViews = new();
+        readonly HashSet<Guid> plantLookPausedPersonIds = new();
 
         MasterDatabase masters;
         World world;
@@ -74,6 +78,7 @@ namespace LittlePeopleWorld.Unity
             }
 
             world.SetDisplayAspect(mapper.WorldWidth / mapper.WorldHeight);
+            world.SetMovementPausedLittlePeople(plantLookPausedPersonIds);
             var inputProvider = InputProvider;
             orchestrator.AdvanceFrame(Time.deltaTime, inputProvider?.InteractionObjects ?? Array.Empty<InteractionObject>());
             world = orchestrator.World;
@@ -276,6 +281,7 @@ namespace LittlePeopleWorld.Unity
         void BuildWorld()
         {
             world = orchestrator.CreateWorld(worldPresetId);
+            plantLookPausedPersonIds.Clear();
             littlePeopleRoot = CreateRoot("Little People");
             objectsRoot = CreateRoot("Interaction Objects");
             surfacesRoot = CreateRoot("Walkable Surfaces");
@@ -318,11 +324,26 @@ namespace LittlePeopleWorld.Unity
 
         void SyncLittlePeopleViews()
         {
+            plantLookPausedPersonIds.Clear();
+
             for (var i = 0; i < world.LittlePeople.Count && i < littlePersonViews.Count; i++)
             {
                 var person = world.LittlePeople[i];
                 var archetype = masters.LittlePersonArchetypes.Get(person.ArchetypeId);
-                littlePersonViews[i].Render(person, archetype, mapper);
+                var plantLookTargetWorld = Vector3.zero;
+                var hasPlantLookTarget =
+                    enableLittlePersonPlantLook &&
+                    maskAnimationController != null &&
+                    maskAnimationController.TryGetNearestPlantLookTarget(
+                        mapper.ToWorld(person.Position),
+                        littlePersonPlantLookRadius,
+                        out plantLookTargetWorld);
+                var view = littlePersonViews[i];
+                view.Render(person, archetype, mapper, hasPlantLookTarget, plantLookTargetWorld);
+                if (view.IsLookingAtPlant)
+                {
+                    plantLookPausedPersonIds.Add(person.Id);
+                }
             }
         }
 
