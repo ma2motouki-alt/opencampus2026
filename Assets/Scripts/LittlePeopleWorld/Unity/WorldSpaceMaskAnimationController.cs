@@ -78,6 +78,9 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] int rainOcclusionProbeRadiusPx = 1;
         [SerializeField] int rainOcclusionTopPaddingPx = 1;
         [SerializeField] bool showRainOcclusionDebug;
+        [SerializeField] bool enableRainVisualOcclusion = true;
+        [SerializeField] float rainOcclusionVisualSmoothingSeconds = 0.12f;
+        [SerializeField] int rainOcclusionMinVisibleHeightPx = 4;
 
         [SerializeField] int maxPlants = 10;
         [SerializeField] float plantMaxHeightPx = 46f;
@@ -124,6 +127,7 @@ namespace LittlePeopleWorld.Unity
         readonly Dictionary<int, PlantViewRuntime> plantViews = new();
         readonly Dictionary<int, float> rainActiveSeconds = new();
         readonly Dictionary<int, int> rainLandedCounts = new();
+        readonly Dictionary<int, float> rainVisibleHeightRatios = new();
         readonly Dictionary<int, float> particleCloudRainCooldowns = new();
         readonly List<int> floodStack = new();
         readonly List<int> componentBuffer = new();
@@ -146,6 +150,7 @@ namespace LittlePeopleWorld.Unity
         int nextPlantId = 1;
         int rainOcclusionBlockedDropsThisFrame;
         int rainOcclusionLandedDropsThisFrame;
+        int rainOcclusionVisualClippedColumnsThisFrame;
 
         public bool HasActivePlants => plants.Count > 0;
 
@@ -153,6 +158,18 @@ namespace LittlePeopleWorld.Unity
         public int PlantBloomSequence { get; private set; }
         public int FlowerBurstSequence { get; private set; }
         public string RainOcclusionDebugText { get; private set; } = string.Empty;
+
+        public float GetRainVisibleHeightRatio(VisualEffectInstance effect)
+        {
+            if (effect == null || !enableRainVisualOcclusion)
+            {
+                return 1f;
+            }
+
+            return rainVisibleHeightRatios.TryGetValue(effect.Id, out var ratio)
+                ? Mathf.Clamp01(ratio)
+                : 1f;
+        }
 
         public bool HasGrowingPlants
         {
@@ -1066,6 +1083,7 @@ namespace LittlePeopleWorld.Unity
         {
             rainOcclusionBlockedDropsThisFrame = 0;
             rainOcclusionLandedDropsThisFrame = 0;
+            rainOcclusionVisualClippedColumnsThisFrame = 0;
             RainOcclusionDebugText = string.Empty;
 
             if (enableRainPlants)
@@ -1080,6 +1098,7 @@ namespace LittlePeopleWorld.Unity
         void UpdateRainLanding(World world, MasterDatabase masters, float dt)
         {
             var liveKeys = new HashSet<int>();
+            var liveEffectIds = new HashSet<int>();
 
             foreach (var effect in world.VisualEffects)
             {
@@ -1091,20 +1110,23 @@ namespace LittlePeopleWorld.Unity
 
                 var key = effect.SourceObjectId != 0 ? effect.SourceObjectId : effect.Id;
                 liveKeys.Add(key);
+                liveEffectIds.Add(effect.Id);
 
                 rainActiveSeconds.TryGetValue(key, out var activeSeconds);
                 rainLandedCounts.TryGetValue(key, out var landedCount);
                 activeSeconds += dt;
 
                 var rainOrigin = NormalizedToMaskPx(effect.Position);
+                var rainHalfWidthPx = Mathf.Max(2f, effect.Size.x * MaskW * 0.45f);
+                UpdateRainVisualOcclusion(effect, rainOrigin, rainHalfWidthPx, dt);
+
                 var fallDistance = Mathf.Max(1f, rainOrigin.y - groundYPx);
                 var landingInterval = fallDistance / Mathf.Max(1f, rainFallSpeedPxPerSec);
                 var shouldHaveLanded = Mathf.FloorToInt(activeSeconds / Mathf.Max(0.05f, landingInterval));
 
                 while (landedCount < shouldHaveLanded)
                 {
-                    var widthPx = Mathf.Max(2f, effect.Size.x * MaskW * 0.45f);
-                    var jitterX = UnityEngine.Random.Range(-widthPx, widthPx);
+                    var jitterX = UnityEngine.Random.Range(-rainHalfWidthPx, rainHalfWidthPx);
                     var landingPosition = new Vector2(Mathf.Clamp(rainOrigin.x + jitterX, 1f, MaskW - 2f), groundYPx);
                     var dropOrigin = new Vector2(landingPosition.x, rainOrigin.y);
                     if (IsRainBlockedByMask(dropOrigin, landingPosition))
@@ -1125,11 +1147,65 @@ namespace LittlePeopleWorld.Unity
             }
 
             RemoveDeadRainSources(liveKeys);
+            RemoveDeadRainVisualOcclusion(liveEffectIds);
+        }
+
+        void UpdateRainVisualOcclusion(VisualEffectInstance effect, Vector2 rainOriginPx, float rainHalfWidthPx, float dt)
+        {
+            if (!enableRainVisualOcclusion)
+            {
+                rainVisibleHeightRatios.Remove(effect.Id);
+                return;
+            }
+
+            var fullDistance = Mathf.Max(1f, Mathf.Abs(rainOriginPx.y - groundYPx));
+            var bestBlockedDistance = float.MaxValue;
+            const int SampleCount = 5;
+
+            for (var i = 0; i < SampleCount; i++)
+            {
+                var t = SampleCount == 1 ? 0.5f : (float)i / (SampleCount - 1);
+                var x = Mathf.Clamp(rainOriginPx.x + Mathf.Lerp(-rainHalfWidthPx, rainHalfWidthPx, t), 1f, MaskW - 2f);
+                var sampleOrigin = new Vector2(x, rainOriginPx.y);
+                var sampleLanding = new Vector2(x, groundYPx);
+                if (!TryFindRainOcclusionY(sampleOrigin, sampleLanding, out var blockedY))
+                {
+                    continue;
+                }
+
+                var blockedDistance = Mathf.Abs(rainOriginPx.y - blockedY);
+                if (blockedDistance < bestBlockedDistance)
+                {
+                    bestBlockedDistance = blockedDistance;
+                }
+            }
+
+            var targetRatio = 1f;
+            if (bestBlockedDistance < float.MaxValue)
+            {
+                var minVisibleHeight = Mathf.Clamp(rainOcclusionMinVisibleHeightPx, 0, Mathf.RoundToInt(fullDistance));
+                var visibleHeight = Mathf.Clamp(bestBlockedDistance, minVisibleHeight, fullDistance);
+                targetRatio = Mathf.Clamp01(visibleHeight / fullDistance);
+                rainOcclusionVisualClippedColumnsThisFrame++;
+            }
+
+            var currentRatio = rainVisibleHeightRatios.TryGetValue(effect.Id, out var current)
+                ? current
+                : targetRatio;
+            var smoothingSeconds = Mathf.Max(0f, rainOcclusionVisualSmoothingSeconds);
+            var blend = smoothingSeconds <= 0.0001f ? 1f : 1f - Mathf.Exp(-Mathf.Max(0f, dt) / smoothingSeconds);
+            rainVisibleHeightRatios[effect.Id] = Mathf.Lerp(currentRatio, targetRatio, blend);
         }
 
         bool IsRainBlockedByMask(Vector2 rainOriginPx, Vector2 landingPx)
         {
-            if (!enableRainOcclusionByMask || effectiveMask == null || effectiveWhiteCount <= 0)
+            return enableRainOcclusionByMask && TryFindRainOcclusionY(rainOriginPx, landingPx, out _);
+        }
+
+        bool TryFindRainOcclusionY(Vector2 rainOriginPx, Vector2 landingPx, out int blockedYPx)
+        {
+            blockedYPx = 0;
+            if (effectiveMask == null || effectiveWhiteCount <= 0)
             {
                 return false;
             }
@@ -1159,6 +1235,7 @@ namespace LittlePeopleWorld.Unity
                 {
                     if (effectiveMask[row + x])
                     {
+                        blockedYPx = y;
                         return true;
                     }
                 }
@@ -1182,7 +1259,7 @@ namespace LittlePeopleWorld.Unity
 
             var status = enableRainOcclusionByMask ? "on" : "off";
             RainOcclusionDebugText =
-                $"Rain Occlusion: {status}  Blocked: {rainOcclusionBlockedDropsThisFrame}  Landed: {rainOcclusionLandedDropsThisFrame}  Mask: {effectiveWhiteCount}";
+                $"Rain Occlusion: {status}  Blocked: {rainOcclusionBlockedDropsThisFrame}  Landed: {rainOcclusionLandedDropsThisFrame}  Clipped: {rainOcclusionVisualClippedColumnsThisFrame}  Mask: {effectiveWhiteCount}";
         }
 
         void RemoveDeadRainSources(HashSet<int> liveKeys)
@@ -1200,6 +1277,23 @@ namespace LittlePeopleWorld.Unity
             {
                 rainActiveSeconds.Remove(key);
                 rainLandedCounts.Remove(key);
+            }
+        }
+
+        void RemoveDeadRainVisualOcclusion(HashSet<int> liveEffectIds)
+        {
+            var dead = new List<int>();
+            foreach (var effectId in rainVisibleHeightRatios.Keys)
+            {
+                if (!liveEffectIds.Contains(effectId))
+                {
+                    dead.Add(effectId);
+                }
+            }
+
+            foreach (var effectId in dead)
+            {
+                rainVisibleHeightRatios.Remove(effectId);
             }
         }
 

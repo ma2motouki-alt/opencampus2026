@@ -15,6 +15,7 @@ Phase 1 で作った雨遮蔽判定を、雨の見た目にも反映する。
 - 雨の見た目と植物成長判定の整合
 - 複数 RainColumn の遮蔽対応
 - 表示ちらつきの軽減
+- Inspector 調整値
 
 含めないもの:
 
@@ -23,119 +24,60 @@ Phase 1 で作った雨遮蔽判定を、雨の見た目にも反映する。
 - 検出物体の材質ごとの雨表現
 - Python / RealSense 側の変更
 
-## Dependency
+## Implementation
 
-Phase 2 は Phase 1 の完了後に行う。
-
-前提:
-
-- `IsRainBlockedByMask()` 相当の判定がある
-- 雨が遮蔽された場合に地面へ届かないロジックがある
-- 遮蔽位置、または少なくとも遮蔽された高さを取得できる
-
-## Current Implementation
-
-雨の描画は `VisualEffectView` の `RainColumnEffectRenderer` が担当している。
+`WorldSpaceMaskAnimationController` が `RainColumn` ごとの表示高さ倍率を計算し、`VisualEffectView` がその倍率を受け取って RainColumn の描画高さを短くする。
 
 ```text
-VisualEffectInstance
-  -> VisualEffectView
-  -> RainColumnEffectRenderer.Render()
-      -> effect.Size.y の高さで雨粒を描画
+WorldSpaceMaskAnimationController
+  -> TryFindRainOcclusionY()
+  -> rainVisibleHeightRatios[effect.Id]
+  -> LittlePeopleWorldController
+  -> VisualEffectView.Render(..., rainVisibleHeightRatio)
+  -> RainColumnEffectRenderer
 ```
-
-Phase 1 では `WorldSpaceMaskAnimationController` が遮蔽判定を持つ想定なので、Phase 2 ではその情報を描画側へどう渡すかを決める必要がある。
-
-## Implementation Options
-
-### Option A: Animation Layer Stores Occlusion State
-
-`WorldSpaceMaskAnimationController` が RainColumn ごとの遮蔽情報を保持する。
-
-```text
-rainOcclusionByEffectKey:
-  source id or effect id
-  -> blockedY / visibleHeight
-```
-
-`LittlePeopleWorldController` 経由で `VisualEffectView` に渡すか、`VisualEffectView` が参照できる表示用データを用意する。
-
-メリット:
-
-- Phase 1 の判定結果をそのまま使える
-- 植物成長と見た目のズレを減らせる
-
-デメリット:
-
-- Controller と View の同期処理が少し増える
-
-### Option B: VisualEffectView Also Samples Mask
-
-`VisualEffectView` が直接マスクを見て雨を短くする。
-
-メリット:
-
-- 表示の中で完結する
-
-デメリット:
-
-- `VisualEffectView` が `WorldSpaceMaskAnimationController` の内部マスクを知ることになる
-- 責務が混ざりやすい
-
-推奨は **Option A**。
 
 ## Required Features
 
 ### Occlusion Height
 
-Phase 1 の `IsRainBlockedByMask()` を拡張し、遮蔽された最初の y 座標を返せるようにする。
-
-想定:
+Phase 1 の雨遮蔽判定を拡張し、遮蔽された最初の y 座標を返せるようにする。
 
 ```text
 TryFindRainOcclusionY(rainOriginPx, landingPx, out blockedYPx)
 ```
 
-### Visual Height Conversion
+### Visual Height Ratio
 
-遮蔽位置を正規化座標またはワールド座標へ変換し、`RainColumn` の見た目の高さを短くする。
-
-```text
-visibleHeight = blockedY - rainOriginY
-```
-
-低解像度マスク座標からの変換には既存の変換を使う。
-
-- `MaskPxToNormalized`
-- `MaskToWorld`
-
-### Stabilization
-
-検出マスクのノイズで雨の高さが細かく揺れる可能性がある。
-
-必要なら以下を入れる。
+雨の発生位置から地面までを `1.0` とし、遮蔽位置までの距離を表示高さ倍率にする。
 
 ```text
-rainOcclusionVisualSmoothingSeconds = 0.12
-rainOcclusionMinVisibleHeightPx = 4
+visibleHeightRatio = distance(rainOrigin, blockedY) / distance(rainOrigin, groundY)
 ```
 
-## Proposed Parameters
+遮蔽がない場合は `1.0` に戻す。
 
-```text
-enableRainVisualOcclusion = true
-rainOcclusionVisualSmoothingSeconds = 0.12
-rainOcclusionMinVisibleHeightPx = 4
-```
+### Sampling
 
-## Work Items
+雨柱は横幅を持つため、中心線だけではなく雨幅内を複数点サンプリングする。
 
-- Phase 1 の遮蔽判定を「遮蔽位置を返す」形へ拡張する
-- RainColumn ごとの遮蔽高さを保持する
-- `VisualEffectView` またはその呼び出し前で雨表示高さを調整する
-- 遮蔽がない場合は従来通りの表示に戻す
-- 表示のちらつきが強い場合はスムージングする
-- `parameter-manual.md` に追記する
+- 初期実装は 5 点
+- もっとも雨源に近い遮蔽位置を採用
+- これにより、手や物体に雨が当たった瞬間に雨柱がそこで止まって見える
+
+### Smoothing
+
+検出マスクのノイズで雨の高さが細かく揺れるため、表示高さ倍率は軽くスムージングする。
+
+## Parameters
+
+| Parameter | Default | Meaning |
+|---|---:|---|
+| `enableRainVisualOcclusion` | `true` | 雨の見た目を検出マスクで短くする |
+| `rainOcclusionVisualSmoothingSeconds` | `0.12` | 雨の高さ変化のスムージング秒数 |
+| `rainOcclusionMinVisibleHeightPx` | `4` | 遮蔽時でも最低限表示する雨の高さ |
+
+既存の `rainOcclusionProbeRadiusPx` は、着地判定と表示遮蔽の両方に使う。
 
 ## Acceptance Check
 
@@ -148,4 +90,4 @@ rainOcclusionMinVisibleHeightPx = 4
 
 ## Handoff Notes
 
-Phase 2 は Phase 1 より差分が大きくなる可能性がある。まず Phase 1 の判定が安定してから着手する。
+Phase 2 は見た目の調整が必要になりやすい。まず `rainOcclusionProbeRadiusPx = 0..1`、`rainOcclusionVisualSmoothingSeconds = 0.08..0.18` あたりから調整する。

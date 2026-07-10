@@ -22,7 +22,11 @@ namespace LittlePeopleWorld.Unity
             activeRenderer = nullRenderer;
         }
 
-        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper)
+        public void Render(
+            VisualEffectInstance effect,
+            VisualEffectMaster master,
+            NormalizedScreenMapper mapper,
+            float rainVisibleHeightRatio = 1f)
         {
             SourceEffectId = effect.Id;
             transform.position = mapper.ToWorld(effect.Position);
@@ -35,7 +39,7 @@ namespace LittlePeopleWorld.Unity
                 activeRenderer = renderer;
             }
 
-            activeRenderer.Render(effect, master, mapper);
+            activeRenderer.Render(effect, master, mapper, rainVisibleHeightRatio);
         }
 
         void Register(IVisualEffectRenderer renderer)
@@ -59,7 +63,7 @@ namespace LittlePeopleWorld.Unity
     {
         VisualEffectKind Kind { get; }
         void Initialize(Transform root);
-        void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper);
+        void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper, float rainVisibleHeightRatio);
         void Hide();
     }
 
@@ -71,7 +75,7 @@ namespace LittlePeopleWorld.Unity
         {
         }
 
-        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper)
+        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper, float rainVisibleHeightRatio)
         {
         }
 
@@ -98,12 +102,17 @@ namespace LittlePeopleWorld.Unity
             Hide();
         }
 
-        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper)
+        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper, float rainVisibleHeightRatio)
         {
             var size = mapper.ToWorldScale(effect.Size);
             var width = size.x;
-            var height = size.y;
+            var height = size.y * Mathf.Clamp01(rainVisibleHeightRatio);
             var alpha = master.Alpha * Mathf.Clamp01(effect.RemainingSeconds / 0.18f);
+            if (height <= 0.0001f || alpha <= 0.0001f)
+            {
+                Hide();
+                return;
+            }
 
             for (var i = 0; i < renderers.Count; i++)
             {
@@ -167,7 +176,7 @@ namespace LittlePeopleWorld.Unity
             Hide();
         }
 
-        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper)
+        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper, float rainVisibleHeightRatio)
         {
             var size = mapper.ToWorldScale(effect.Size);
             var radius = Mathf.Max(size.x, size.y) * 0.5f;
@@ -227,7 +236,7 @@ namespace LittlePeopleWorld.Unity
             this.root = root;
         }
 
-        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper)
+        public void Render(VisualEffectInstance effect, VisualEffectMaster master, NormalizedScreenMapper mapper, float rainVisibleHeightRatio)
         {
             if (string.IsNullOrWhiteSpace(master.AssetKey))
             {

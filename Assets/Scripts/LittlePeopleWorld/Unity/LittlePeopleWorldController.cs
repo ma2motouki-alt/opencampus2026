@@ -84,8 +84,8 @@ namespace LittlePeopleWorld.Unity
             SyncWalkableSurfaceViews();
             SyncPropObstacleViews();
             SyncAmbientObjectViews();
-            SyncVisualEffectViews();
             SyncRecognitionMaskAnimation();
+            SyncVisualEffectViews();
             SyncAudioLayers();
         }
 
@@ -441,7 +441,10 @@ namespace LittlePeopleWorld.Unity
                 }
 
                 var effectMaster = masters.VisualEffects.Get(visualEffect.VisualEffectMasterId);
-                view.Render(visualEffect, effectMaster, mapper);
+                var rainVisibleHeightRatio = maskAnimationController != null
+                    ? maskAnimationController.GetRainVisibleHeightRatio(visualEffect)
+                    : 1f;
+                view.Render(visualEffect, effectMaster, mapper, rainVisibleHeightRatio);
             }
 
             RemoveDeadVisualEffectViews(liveIds);
