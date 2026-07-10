@@ -106,9 +106,10 @@ namespace LittlePeopleWorld.Unity
         {
             var size = mapper.ToWorldScale(effect.Size);
             var width = size.x;
-            var height = size.y * Mathf.Clamp01(rainVisibleHeightRatio);
+            var fullHeight = size.y;
+            var visibleHeight = fullHeight * Mathf.Clamp01(rainVisibleHeightRatio);
             var alpha = master.Alpha * Mathf.Clamp01(effect.RemainingSeconds / 0.18f);
-            if (height <= 0.0001f || alpha <= 0.0001f)
+            if (visibleHeight <= 0.0001f || alpha <= 0.0001f)
             {
                 Hide();
                 return;
@@ -122,10 +123,10 @@ namespace LittlePeopleWorld.Unity
                 var seed = Mathf.Repeat(i * 0.3819f, 1f);
                 var x = (seed - 0.5f) * width;
                 var phase = Mathf.Repeat(effect.AgeSeconds * master.PulseSpeed * 0.22f + i * 0.137f, 1f);
-                var y = -phase * height;
+                var y = -phase * visibleHeight;
                 // しずく1粒の大きさ。縦長(高さ>幅)にして水滴らしくする。
                 // master.DropSizeScale で全体のサイズを独立して調整できる(既定1f)。
-                var dropLength = Mathf.Lerp(height * 0.10f, height * 0.18f, Mathf.Repeat(seed * 3.1f, 1f)) * master.DropSizeScale;
+                var dropLength = Mathf.Lerp(fullHeight * 0.10f, fullHeight * 0.18f, Mathf.Repeat(seed * 3.1f, 1f)) * master.DropSizeScale;
                 var dropWidth = dropLength * 0.42f;
 
                 renderer.transform.localPosition = new Vector3(x, y, 0f);
