@@ -11,7 +11,8 @@ Create an interactive exhibit on a horizontal display. Visitors place or hover h
 - Unity receives normalized `InteractionObject` values over UDP.
 - Contour objects are filled on screen so visitors can see their own hand or object shape reflected in the world.
 - Particles react to the contour mask, rain, and plants.
-- Clouds and stars drift as ambient world objects.
+- Three clouds drift as ambient world objects.
+- One sun remains fixed near the upper-right area.
 - A cloud touched by a little person or by small particles creates rain.
 - Rain grows plants from the lower part of the screen.
 - Particles climb plants and gather near flowers.

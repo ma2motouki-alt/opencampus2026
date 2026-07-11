@@ -20,6 +20,7 @@ Master data is immutable while the app is running. Domain objects hold runtime s
 | `InteractionObjectTypeMaster` | Hand, round prop, bar prop, block prop defaults. |
 | `InteractionFieldMaster` | Repel, curiosity, and legacy field definitions. |
 | `WalkableSurfaceMaster` | Prop edge walking, riding, transfer, obstacle, and reconnect tuning. |
+| `RainbowMaster` | Rainbow trigger, lifetime, geometry, walking, and touch tuning. |
 | `AmbientObjectTypeMaster` | Cloud and star size, drift, touch radius, movement band, and effect link. |
 | `VisualEffectMaster` | Procedural or prefab visual effect definitions. |
 | `SoundCueMaster` | Placeholder for future audio cues. |
@@ -73,8 +74,9 @@ The movement band keeps clouds away from ordinary edge-walk routes.
 
 ### Star
 
-- Size: `0.06 x 0.06`
-- Drift: `0.01 x 0.006`
+- Display role: fixed sun
+- Size: `0.08 x 0.08`
+- Drift: `0 x 0`
 - Contact radius: `0.085`
 - Visual effect: `StarBurst`
 
@@ -96,9 +98,9 @@ Important values:
 - `InputHitPadding = 0.02`
 - `HandContourReactionPadding = 0.035`
 - `FallDuration = 0.72`
-- `AmbientCloudCount = 2`
-- `AmbientStarCount = 2`
-- `RainLingerSeconds = 5.0`
+- `AmbientCloudCount = 3`
+- `AmbientStarCount = 1`
+- `RainLingerSeconds = 2.0`
 - `StarCooldownSeconds = 1.4`
 - `SurfaceReconnectCooldownSeconds = 1.1`
 

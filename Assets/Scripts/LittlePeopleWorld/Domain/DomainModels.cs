@@ -48,6 +48,14 @@ namespace LittlePeopleWorld.Domain
         Cooldown
     }
 
+    public enum RainbowState
+    {
+        Appearing,
+        Active,
+        Fading,
+        Expired
+    }
+
     public enum VisualEffectKind
     {
         SoftGlow = 1,
@@ -80,7 +88,14 @@ namespace LittlePeopleWorld.Domain
 
     public enum WalkableSurfaceShape
     {
-        Line = 1
+        Line = 1,
+        Polyline = 2
+    }
+
+    public enum WalkableSurfaceKind
+    {
+        Bar = 1,
+        Rainbow = 2
     }
 
     public enum LittlePersonEmotion
@@ -416,33 +431,41 @@ namespace LittlePeopleWorld.Domain
 
     public sealed class WalkableSurface
     {
+        readonly List<Vector2> pathPoints = new();
+        readonly List<float> cumulativeLengths = new();
+        float totalLength;
+
         public int Id { get; }
         public int SourceObjectId { get; }
-        public InteractionObjectKind SourceKind { get; }
+        public InteractionObjectKind? SourceKind { get; }
         public InteractionObjectState SourceState { get; }
         public Vector2 SourceVelocity { get; }
         public WalkableSurfaceShape Shape { get; }
+        public WalkableSurfaceKind Kind { get; }
         public Vector2 Start { get; }
         public Vector2 End { get; }
         public float Width { get; }
         public int SideIndex { get; }
         public Vector2 WalkableNormal { get; }
         public Vector2 PhysicalTipPoint { get; }
+        public IReadOnlyList<Vector2> PathPoints => pathPoints;
+        public bool AllowsNewAttachment { get; }
         public float AttachProgress { get; }
         public float ExitProgress { get; }
         public Vector2 AttachPoint => PositionAt(AttachProgress);
         public Vector2 PathEndPoint => PositionAt(ExitProgress);
         public Vector2 ExitPoint { get; }
-        public float Length => Mathf.Max(0.001f, Vector2.Distance(Start, End));
+        public float Length => Mathf.Max(0.001f, totalLength);
         public bool IsDragging => SourceState == InteractionObjectState.Dragging;
 
         public WalkableSurface(
             int id,
             int sourceObjectId,
-            InteractionObjectKind sourceKind,
+            InteractionObjectKind? sourceKind,
             InteractionObjectState sourceState,
             Vector2 sourceVelocity,
             WalkableSurfaceShape shape,
+            WalkableSurfaceKind kind,
             Vector2 start,
             Vector2 end,
             float width,
@@ -451,7 +474,9 @@ namespace LittlePeopleWorld.Domain
             Vector2 physicalTipPoint,
             Vector2 exitPoint,
             float attachProgress,
-            float exitProgress)
+            float exitProgress,
+            bool allowsNewAttachment = true,
+            IReadOnlyList<Vector2> points = null)
         {
             Id = id;
             SourceObjectId = sourceObjectId;
@@ -459,8 +484,18 @@ namespace LittlePeopleWorld.Domain
             SourceState = sourceState;
             SourceVelocity = sourceVelocity;
             Shape = shape;
-            Start = start;
-            End = end;
+            Kind = kind;
+            if (points != null && points.Count >= 2)
+            {
+                pathPoints.AddRange(points);
+            }
+            else
+            {
+                pathPoints.Add(start);
+                pathPoints.Add(end);
+            }
+            Start = pathPoints[0];
+            End = pathPoints[pathPoints.Count - 1];
             Width = Mathf.Max(0.001f, width);
             SideIndex = sideIndex;
             WalkableNormal = walkableNormal.sqrMagnitude > 0.000001f ? walkableNormal.normalized : Vector2.up;
@@ -468,29 +503,96 @@ namespace LittlePeopleWorld.Domain
             ExitPoint = exitPoint;
             AttachProgress = Mathf.Clamp(attachProgress, 0f, 0.98f);
             ExitProgress = Mathf.Clamp(exitProgress, AttachProgress + 0.001f, 1f);
+            AllowsNewAttachment = allowsNewAttachment;
+            RebuildPathLengths();
         }
 
         public Vector2 PositionAt(float progress)
         {
-            return Vector2.Lerp(Start, End, Mathf.Clamp01(progress));
+            var targetDistance = Mathf.Clamp01(progress) * totalLength;
+            for (var i = 1; i < pathPoints.Count; i++)
+            {
+                if (cumulativeLengths[i] < targetDistance)
+                {
+                    continue;
+                }
+
+                var segmentStartDistance = cumulativeLengths[i - 1];
+                var segmentLength = Mathf.Max(0.000001f, cumulativeLengths[i] - segmentStartDistance);
+                var segmentProgress = Mathf.Clamp01((targetDistance - segmentStartDistance) / segmentLength);
+                return Vector2.Lerp(pathPoints[i - 1], pathPoints[i], segmentProgress);
+            }
+
+            return End;
         }
 
         public Vector2 Tangent()
         {
-            var tangent = End - Start;
-            return tangent.sqrMagnitude > 0.000001f ? tangent.normalized : Vector2.right;
+            return TangentAt(ExitProgress);
+        }
+
+        public Vector2 TangentAt(float progress)
+        {
+            var targetDistance = Mathf.Clamp01(progress) * totalLength;
+            for (var i = 1; i < pathPoints.Count; i++)
+            {
+                if (cumulativeLengths[i] + 0.000001f < targetDistance)
+                {
+                    continue;
+                }
+
+                var tangent = pathPoints[i] - pathPoints[i - 1];
+                if (tangent.sqrMagnitude > 0.000001f)
+                {
+                    return tangent.normalized;
+                }
+            }
+
+            var fallback = End - Start;
+            return fallback.sqrMagnitude > 0.000001f ? fallback.normalized : Vector2.right;
         }
 
         public float ClosestProgress(Vector2 point, out Vector2 closestPoint, out float distance)
         {
-            var segment = End - Start;
-            var lengthSqr = segment.sqrMagnitude;
-            var progress = lengthSqr > 0.000001f
-                ? Mathf.Clamp01(Vector2.Dot(point - Start, segment) / lengthSqr)
-                : 0f;
-            closestPoint = PositionAt(progress);
-            distance = Vector2.Distance(point, closestPoint);
-            return progress;
+            closestPoint = Start;
+            var bestSqrDistance = float.MaxValue;
+            var bestPathDistance = 0f;
+
+            for (var i = 1; i < pathPoints.Count; i++)
+            {
+                var segmentStart = pathPoints[i - 1];
+                var segment = pathPoints[i] - segmentStart;
+                var segmentLengthSqr = segment.sqrMagnitude;
+                var segmentProgress = segmentLengthSqr > 0.000001f
+                    ? Mathf.Clamp01(Vector2.Dot(point - segmentStart, segment) / segmentLengthSqr)
+                    : 0f;
+                var candidate = segmentStart + segment * segmentProgress;
+                var sqrDistance = Vector2.SqrMagnitude(point - candidate);
+                if (sqrDistance >= bestSqrDistance)
+                {
+                    continue;
+                }
+
+                bestSqrDistance = sqrDistance;
+                closestPoint = candidate;
+                var segmentLength = Mathf.Sqrt(segmentLengthSqr);
+                bestPathDistance = cumulativeLengths[i - 1] + segmentLength * segmentProgress;
+            }
+
+            distance = Mathf.Sqrt(bestSqrDistance);
+            return totalLength > 0.000001f ? Mathf.Clamp01(bestPathDistance / totalLength) : 0f;
+        }
+
+        void RebuildPathLengths()
+        {
+            cumulativeLengths.Clear();
+            cumulativeLengths.Add(0f);
+            totalLength = 0f;
+            for (var i = 1; i < pathPoints.Count; i++)
+            {
+                totalLength += Vector2.Distance(pathPoints[i - 1], pathPoints[i]);
+                cumulativeLengths.Add(totalLength);
+            }
         }
 
         public bool CanAttachFrom(Vector2 point, float sideTolerance)
@@ -568,6 +670,7 @@ namespace LittlePeopleWorld.Domain
                 interactionObject.State,
                 interactionObject.Velocity,
                 WalkableSurfaceShape.Line,
+                WalkableSurfaceKind.Bar,
                 surfaceStart,
                 surfaceEnd,
                 master.SurfaceWidth,
@@ -975,6 +1078,162 @@ namespace LittlePeopleWorld.Domain
             return new Vector2(Mathf.Clamp01(value.x), Mathf.Clamp01(value.y));
         }
     }
+    public sealed class RainbowInstance
+    {
+        readonly List<Vector2> pathPoints = new();
+        readonly List<Vector2> reversedPathPoints = new();
+
+        public int Id { get; }
+        public int SourceCloudId { get; }
+        public RainbowState State { get; private set; }
+        public Vector2 LeftFoot { get; }
+        public Vector2 RightFoot { get; }
+        public Vector2 Apex { get; }
+        public IReadOnlyList<Vector2> PathPoints => pathPoints;
+        public float DurationSeconds { get; }
+        public float AppearDurationSeconds { get; }
+        public float FadeDurationSeconds { get; }
+        public float AgeSeconds { get; private set; }
+        public float RemainingSeconds => Mathf.Max(0f, DurationSeconds - AgeSeconds);
+        public bool IsExpired => State == RainbowState.Expired;
+        public bool AllowsNewAttachment => State == RainbowState.Active;
+
+        public float Opacity
+        {
+            get
+            {
+                if (State == RainbowState.Expired)
+                {
+                    return 0f;
+                }
+
+                if (AppearDurationSeconds > 0f && AgeSeconds < AppearDurationSeconds)
+                {
+                    return Mathf.Clamp01(AgeSeconds / AppearDurationSeconds);
+                }
+
+                if (FadeDurationSeconds > 0f && RemainingSeconds <= FadeDurationSeconds)
+                {
+                    return Mathf.Clamp01(RemainingSeconds / FadeDurationSeconds);
+                }
+
+                return 1f;
+            }
+        }
+
+        public RainbowInstance(
+            int id,
+            int sourceCloudId,
+            Vector2 cloudPosition,
+            Vector2 sunPosition,
+            float edgePadding,
+            RainbowMaster master)
+        {
+            if (master == null)
+            {
+                throw new ArgumentNullException(nameof(master));
+            }
+
+            Id = id;
+            SourceCloudId = sourceCloudId;
+            DurationSeconds = master.DurationSeconds;
+            AppearDurationSeconds = master.AppearDurationSeconds;
+            FadeDurationSeconds = master.FadeDurationSeconds;
+            State = RainbowState.Appearing;
+
+            var groundY = Mathf.Clamp01(1f - edgePadding);
+            var halfSpan = master.SpanNormalized * 0.5f;
+            var minCenterX = edgePadding + halfSpan;
+            var maxCenterX = 1f - edgePadding - halfSpan;
+            var requestedCenterX = (cloudPosition.x + sunPosition.x) * 0.5f;
+            var centerX = minCenterX <= maxCenterX
+                ? Mathf.Clamp(requestedCenterX, minCenterX, maxCenterX)
+                : 0.5f;
+
+            LeftFoot = new Vector2(centerX - halfSpan, groundY);
+            RightFoot = new Vector2(centerX + halfSpan, groundY);
+            Apex = new Vector2(centerX, Mathf.Max(edgePadding + 0.04f, groundY - master.RiseNormalized));
+            var control = new Vector2(centerX, Apex.y * 2f - groundY);
+
+            for (var i = 0; i <= master.PathSegmentCount; i++)
+            {
+                var t = i / (float)master.PathSegmentCount;
+                var inverse = 1f - t;
+                pathPoints.Add(
+                    inverse * inverse * LeftFoot +
+                    2f * inverse * t * control +
+                    t * t * RightFoot);
+            }
+
+            for (var i = pathPoints.Count - 1; i >= 0; i--)
+            {
+                reversedPathPoints.Add(pathPoints[i]);
+            }
+        }
+
+        public void Advance(float deltaTime)
+        {
+            AgeSeconds += Mathf.Max(0f, deltaTime);
+            if (AgeSeconds >= DurationSeconds)
+            {
+                State = RainbowState.Expired;
+            }
+            else if (RemainingSeconds <= FadeDurationSeconds)
+            {
+                State = RainbowState.Fading;
+            }
+            else if (AgeSeconds < AppearDurationSeconds)
+            {
+                State = RainbowState.Appearing;
+            }
+            else
+            {
+                State = RainbowState.Active;
+            }
+        }
+
+        public void AddWalkableSurfaces(List<WalkableSurface> destination, RainbowMaster master)
+        {
+            if (destination == null || master == null || IsExpired)
+            {
+                return;
+            }
+
+            AddSurface(destination, master, pathPoints, -Id * 10 - 1, 1);
+            AddSurface(destination, master, reversedPathPoints, -Id * 10 - 2, -1);
+        }
+
+        void AddSurface(
+            List<WalkableSurface> destination,
+            RainbowMaster master,
+            IReadOnlyList<Vector2> points,
+            int surfaceId,
+            int sideIndex)
+        {
+            var start = points[0];
+            var end = points[points.Count - 1];
+            destination.Add(new WalkableSurface(
+                surfaceId,
+                -Id,
+                null,
+                InteractionObjectState.Placed,
+                Vector2.zero,
+                WalkableSurfaceShape.Polyline,
+                WalkableSurfaceKind.Rainbow,
+                start,
+                end,
+                master.SurfaceWidth,
+                sideIndex,
+                new Vector2(0f, -1f),
+                end,
+                end,
+                0f,
+                1f,
+                AllowsNewAttachment,
+                points));
+        }
+    }
+
 
     public sealed class LittlePerson
     {
@@ -1070,6 +1329,12 @@ namespace LittlePeopleWorld.Domain
 
             AdvanceSurfaceConnectionCooldown(deltaTime);
 
+            if (TryDropFromTouchedRainbow(fields, surfaces, masters, tuning))
+            {
+                AdvanceFalling(deltaTime, tuning);
+                return;
+            }
+
             switch (CurrentBehavior)
             {
                 case LittlePersonBehaviorKind.TransferToSurface:
@@ -1150,6 +1415,46 @@ namespace LittlePeopleWorld.Domain
             Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
         }
 
+        bool TryDropFromTouchedRainbow(
+            IReadOnlyList<InteractionField> fields,
+            IReadOnlyList<WalkableSurface> surfaces,
+            MasterDatabase masters,
+            TuningParameterMaster tuning)
+        {
+            if (CurrentBehavior != LittlePersonBehaviorKind.TransferToSurface &&
+                CurrentBehavior != LittlePersonBehaviorKind.SurfaceWalk &&
+                CurrentBehavior != LittlePersonBehaviorKind.RideSurface)
+            {
+                return false;
+            }
+
+            var surface = FindSurfaceById(surfaces, surfaceId);
+            if (surface == null || surface.Kind != WalkableSurfaceKind.Rainbow || fields == null)
+            {
+                return false;
+            }
+
+            var rainbowMaster = masters.Rainbows.Get(1);
+            foreach (var field in fields)
+            {
+                if (field.SourceKind != InteractionObjectKind.Hand)
+                {
+                    continue;
+                }
+
+                var touchDistance = field.ShapeKind == InteractionShapeKind.Contour
+                    ? rainbowMaster.TouchPadding
+                    : field.Radius;
+                if (field.DistanceTo(Position) <= touchDistance)
+                {
+                    StartFalling(tuning, Position);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         bool TryStartSurfaceTransfer(IReadOnlyList<WalkableSurface> surfaces, MasterDatabase masters, TuningParameterMaster tuning)
         {
             return TryStartSurfaceTransfer(surfaces, masters, tuning, Position, Position, -1);
@@ -1181,12 +1486,20 @@ namespace LittlePeopleWorld.Domain
                     continue;
                 }
 
-                if (surface.SourceKind != InteractionObjectKind.BarProp)
+                if (!surface.AllowsNewAttachment)
                 {
                     continue;
                 }
 
-                if (tuning.BarDragBlocksClimb && surface.SourceState != InteractionObjectState.Placed)
+                if (surface.Kind == WalkableSurfaceKind.Bar &&
+                    surface.SourceKind != InteractionObjectKind.BarProp)
+                {
+                    continue;
+                }
+
+                if (surface.Kind == WalkableSurfaceKind.Bar &&
+                    tuning.BarDragBlocksClimb &&
+                    surface.SourceState != InteractionObjectState.Placed)
                 {
                     continue;
                 }
@@ -1204,7 +1517,10 @@ namespace LittlePeopleWorld.Domain
                 var closestPoint = surface.AttachPoint;
                 var progress = surface.AttachProgress;
                 var distance = Vector2.Distance(probePosition, closestPoint);
-                if (distance <= surfaceMaster.AttachDistance && distance < selectedDistance)
+                var attachDistance = surface.Kind == WalkableSurfaceKind.Rainbow
+                    ? masters.Rainbows.Get(1).AttachDistance
+                    : surfaceMaster.AttachDistance;
+                if (distance <= attachDistance && distance < selectedDistance)
                 {
                     selected = surface;
                     selectedPoint = closestPoint;
@@ -1389,6 +1705,12 @@ namespace LittlePeopleWorld.Domain
 
                 if (surfaceExitDwellTimer >= surfaceMaster.SurfaceExitDwellSeconds)
                 {
+                    if (surface.Kind == WalkableSurfaceKind.Rainbow)
+                    {
+                        CompleteRainbowWalk(surface, tuning);
+                        return;
+                    }
+
                     if (TryStartSurfaceToSurfaceTransfer(surface, surfaces, masters))
                     {
                         return;
@@ -1407,7 +1729,10 @@ namespace LittlePeopleWorld.Domain
             else
             {
                 CurrentBehavior = LittlePersonBehaviorKind.SurfaceWalk;
-                var walkDistance = surfaceMaster.SurfaceWalkSpeed * Mathf.Max(0f, deltaTime);
+                var walkSpeed = surface.Kind == WalkableSurfaceKind.Rainbow
+                    ? masters.Rainbows.Get(1).WalkSpeed
+                    : surfaceMaster.SurfaceWalkSpeed;
+                var walkDistance = walkSpeed * Mathf.Max(0f, deltaTime);
                 surfaceProgress = Mathf.Min(surface.ExitProgress, surfaceProgress + walkDistance / surface.Length);
             }
 
@@ -1433,6 +1758,29 @@ namespace LittlePeopleWorld.Domain
             Position = next;
             Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
         }
+        void CompleteRainbowWalk(WalkableSurface surface, TuningParameterMaster tuning)
+        {
+            edgeProgress = ClosestProgressOnEdge(surface.PathEndPoint, tuning.WorldEdgePadding, out var edgePoint);
+            Position = edgePoint;
+            Velocity = Vector2.zero;
+            CurrentBehavior = LittlePersonBehaviorKind.EdgeWalk;
+            Emotion = LittlePersonEmotion.Calm;
+            TargetObjectId = -1;
+            barSourceObjectId = -1;
+            surfaceId = -1;
+            surfaceSourceObjectId = -1;
+            surfaceExitReached = false;
+            surfaceExitDwellTimer = 0f;
+            climbCooldownSourceObjectId = surface.SourceObjectId;
+            climbCooldownTimer = tuning.SurfaceReconnectCooldownSeconds;
+
+            var tangent = surface.Tangent();
+            if (Mathf.Abs(tangent.x) > 0.0001f)
+            {
+                edgeDirection = tangent.x >= 0f ? -1 : 1;
+            }
+        }
+
 
         bool TryStartSurfaceToSurfaceTransfer(
             WalkableSurface currentSurface,
@@ -1989,9 +2337,14 @@ namespace LittlePeopleWorld.Domain
         readonly List<PropObstacle> propObstacles = new();
         readonly List<AmbientObject> ambientObjects = new();
         readonly List<VisualEffectInstance> visualEffects = new();
+        readonly List<RainbowInstance> rainbows = new();
         readonly HashSet<Guid> movementPausedLittlePersonIds = new();
         int nextVisualEffectId = 1;
+        int nextRainbowId = 1;
         int nextDevelopmentRainSourceId = -100000;
+        int activeBloomCount;
+        bool rainbowConditionLatched;
+        float rainbowCooldownSeconds;
         float displayAspect = 16f / 9f;
 
         public IReadOnlyList<LittlePerson> LittlePeople => littlePeople;
@@ -2001,6 +2354,7 @@ namespace LittlePeopleWorld.Domain
         public IReadOnlyList<PropObstacle> PropObstacles => propObstacles;
         public IReadOnlyList<AmbientObject> AmbientObjects => ambientObjects;
         public IReadOnlyList<VisualEffectInstance> VisualEffects => visualEffects;
+        public IReadOnlyList<RainbowInstance> Rainbows => rainbows;
 
         public void SetDisplayAspect(float aspect)
         {
@@ -2020,6 +2374,11 @@ namespace LittlePeopleWorld.Domain
                 movementPausedLittlePersonIds.Add(personId);
             }
         }
+        public void SetActiveBloomCount(int count)
+        {
+            activeBloomCount = Math.Max(0, count);
+        }
+
 
         public static World Create(MasterDatabase masters, int worldPresetId)
         {
@@ -2054,19 +2413,19 @@ namespace LittlePeopleWorld.Domain
             walkableSurfaces.Clear();
             propObstacles.Clear();
 
-            if (objects == null)
+            var surfaceMaster = masters.WalkableSurfaces.Get(1);
+            if (objects != null)
             {
-                return;
+                foreach (var interactionObject in objects)
+                {
+                    interactionObjects.Add(interactionObject);
+                    interactionFields.Add(interactionObject.CreateField(masters));
+                    WalkableSurface.AddFromInteractionObject(interactionObject, surfaceMaster, walkableSurfaces, displayAspect);
+                    PropObstacle.AddFromInteractionObject(interactionObject, surfaceMaster, propObstacles, displayAspect);
+                }
             }
 
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
-            foreach (var interactionObject in objects)
-            {
-                interactionObjects.Add(interactionObject);
-                interactionFields.Add(interactionObject.CreateField(masters));
-                WalkableSurface.AddFromInteractionObject(interactionObject, surfaceMaster, walkableSurfaces, displayAspect);
-                PropObstacle.AddFromInteractionObject(interactionObject, surfaceMaster, propObstacles, displayAspect);
-            }
+            RebuildRainbowSurfaces(masters);
         }
 
         public void TriggerDevelopmentRain(MasterDatabase masters, Vector2 position, float width, float durationSeconds)
@@ -2127,7 +2486,115 @@ namespace LittlePeopleWorld.Domain
 
             UpdateAmbientReactions(masters, tuning);
             AdvanceVisualEffects(deltaTime);
+            AdvanceRainbows(deltaTime, masters);
+            UpdateRainbowTrigger(masters, tuning);
+            RebuildRainbowSurfaces(masters);
         }
+        void AdvanceRainbows(float deltaTime, MasterDatabase masters)
+        {
+            var rainbowMaster = masters.Rainbows.Get(1);
+            rainbowCooldownSeconds = Mathf.Max(0f, rainbowCooldownSeconds - Mathf.Max(0f, deltaTime));
+
+            for (var i = rainbows.Count - 1; i >= 0; i--)
+            {
+                rainbows[i].Advance(deltaTime);
+                if (!rainbows[i].IsExpired)
+                {
+                    continue;
+                }
+
+                rainbows.RemoveAt(i);
+                rainbowCooldownSeconds = Mathf.Max(rainbowCooldownSeconds, rainbowMaster.CooldownSeconds);
+            }
+        }
+
+        void UpdateRainbowTrigger(MasterDatabase masters, TuningParameterMaster tuning)
+        {
+            var rainbowMaster = masters.Rainbows.Get(1);
+            var hasDistantRainingCloud =
+                TryFindDistantRainingCloud(rainbowMaster, out var sourceCloud, out var sun);
+            var conditionMet = activeBloomCount >= rainbowMaster.RequiredBloomCount && hasDistantRainingCloud;
+
+            if (!conditionMet)
+            {
+                rainbowConditionLatched = false;
+                return;
+            }
+
+            if (rainbowConditionLatched || rainbowCooldownSeconds > 0f || rainbows.Count > 0)
+            {
+                return;
+            }
+
+            rainbows.Add(new RainbowInstance(
+                nextRainbowId++,
+                sourceCloud.Id,
+                sourceCloud.Position,
+                sun.Position,
+                tuning.WorldEdgePadding,
+                rainbowMaster));
+            rainbowConditionLatched = true;
+        }
+
+        bool TryFindDistantRainingCloud(
+            RainbowMaster master,
+            out AmbientObject selectedCloud,
+            out AmbientObject sun)
+        {
+            selectedCloud = null;
+            sun = null;
+            foreach (var ambientObject in ambientObjects)
+            {
+                if (ambientObject.Kind == AmbientObjectKind.Star)
+                {
+                    sun = ambientObject;
+                    break;
+                }
+            }
+
+            if (sun == null)
+            {
+                return false;
+            }
+
+            var selectedDistance = master.MinCloudSunDistance;
+            foreach (var ambientObject in ambientObjects)
+            {
+                if (ambientObject.Kind != AmbientObjectKind.Cloud || !ambientObject.IsReacting)
+                {
+                    continue;
+                }
+
+                var distance = Vector2.Distance(ambientObject.Position, sun.Position);
+                if (distance < selectedDistance)
+                {
+                    continue;
+                }
+
+                selectedCloud = ambientObject;
+                selectedDistance = distance;
+            }
+
+            return selectedCloud != null;
+        }
+
+        void RebuildRainbowSurfaces(MasterDatabase masters)
+        {
+            for (var i = walkableSurfaces.Count - 1; i >= 0; i--)
+            {
+                if (walkableSurfaces[i].Kind == WalkableSurfaceKind.Rainbow)
+                {
+                    walkableSurfaces.RemoveAt(i);
+                }
+            }
+
+            var rainbowMaster = masters.Rainbows.Get(1);
+            foreach (var rainbow in rainbows)
+            {
+                rainbow.AddWalkableSurfaces(walkableSurfaces, rainbowMaster);
+            }
+        }
+
 
         void CreateAmbientObjects(MasterDatabase masters, TuningParameterMaster tuning)
         {

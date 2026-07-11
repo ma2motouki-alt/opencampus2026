@@ -298,6 +298,59 @@ namespace LittlePeopleWorld.Master
         }
     }
 
+    public sealed class RainbowMaster
+    {
+        public int Id { get; }
+        public string Name { get; }
+        public int RequiredBloomCount { get; }
+        public float MinCloudSunDistance { get; }
+        public float DurationSeconds { get; }
+        public float AppearDurationSeconds { get; }
+        public float FadeDurationSeconds { get; }
+        public float CooldownSeconds { get; }
+        public float SpanNormalized { get; }
+        public float RiseNormalized { get; }
+        public int PathSegmentCount { get; }
+        public float AttachDistance { get; }
+        public float WalkSpeed { get; }
+        public float SurfaceWidth { get; }
+        public float TouchPadding { get; }
+
+        public RainbowMaster(
+            int id,
+            string name,
+            int requiredBloomCount,
+            float minCloudSunDistance,
+            float durationSeconds,
+            float appearDurationSeconds,
+            float fadeDurationSeconds,
+            float cooldownSeconds,
+            float spanNormalized,
+            float riseNormalized,
+            int pathSegmentCount,
+            float attachDistance,
+            float walkSpeed,
+            float surfaceWidth,
+            float touchPadding)
+        {
+            Id = id;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            RequiredBloomCount = Math.Max(1, requiredBloomCount);
+            MinCloudSunDistance = Mathf.Max(0.001f, minCloudSunDistance);
+            DurationSeconds = Mathf.Max(0.1f, durationSeconds);
+            AppearDurationSeconds = Mathf.Clamp(appearDurationSeconds, 0f, DurationSeconds);
+            FadeDurationSeconds = Mathf.Clamp(fadeDurationSeconds, 0f, DurationSeconds);
+            CooldownSeconds = Mathf.Max(0f, cooldownSeconds);
+            SpanNormalized = Mathf.Clamp(spanNormalized, 0.1f, 0.95f);
+            RiseNormalized = Mathf.Clamp(riseNormalized, 0.05f, 0.9f);
+            PathSegmentCount = Math.Max(4, pathSegmentCount);
+            AttachDistance = Mathf.Max(0.001f, attachDistance);
+            WalkSpeed = Mathf.Max(0.001f, walkSpeed);
+            SurfaceWidth = Mathf.Max(0.001f, surfaceWidth);
+            TouchPadding = Mathf.Max(0f, touchPadding);
+        }
+    }
+
     public sealed class AmbientObjectTypeMaster
     {
         public int Id { get; }
@@ -469,6 +522,7 @@ namespace LittlePeopleWorld.Master
         public MasterTable<InteractionObjectTypeMaster> InteractionObjectTypes { get; }
         public MasterTable<InteractionFieldMaster> InteractionFields { get; }
         public MasterTable<WalkableSurfaceMaster> WalkableSurfaces { get; }
+        public MasterTable<RainbowMaster> Rainbows { get; }
         public MasterTable<AmbientObjectTypeMaster> AmbientObjectTypes { get; }
         public MasterTable<VisualEffectMaster> VisualEffects { get; }
         public MasterTable<SoundCueMaster> SoundCues { get; }
@@ -483,6 +537,7 @@ namespace LittlePeopleWorld.Master
             MasterTable<InteractionObjectTypeMaster> interactionObjectTypes,
             MasterTable<InteractionFieldMaster> interactionFields,
             MasterTable<WalkableSurfaceMaster> walkableSurfaces,
+            MasterTable<RainbowMaster> rainbows,
             MasterTable<AmbientObjectTypeMaster> ambientObjectTypes,
             MasterTable<VisualEffectMaster> visualEffects,
             MasterTable<SoundCueMaster> soundCues,
@@ -496,6 +551,7 @@ namespace LittlePeopleWorld.Master
             InteractionObjectTypes = interactionObjectTypes;
             InteractionFields = interactionFields;
             WalkableSurfaces = walkableSurfaces;
+            Rainbows = rainbows;
             AmbientObjectTypes = ambientObjectTypes;
             VisualEffects = visualEffects;
             SoundCues = soundCues;
@@ -561,6 +617,11 @@ namespace LittlePeopleWorld.Master
                 new WalkableSurfaceMaster(1, "bar edge lane", 0.14f, 0.22f, 0.13f, 0.72f, 0.022f, 4.32f, 0.22f, 0.03f, 0f, 0.2f, 0.08f, 0.16f, 0.25f, 0.16f, 0.022f, 15f, 0.01f, 0.01f, 0.015f, 0.25f, 0.075f, 0.19f)
             };
 
+            var rainbows = new[]
+            {
+                new RainbowMaster(1, "rare rain-and-bloom rainbow", 4, 0.50f, 8f, 0.5f, 1.2f, 30f, 0.48f, 0.33f, 32, 0.055f, 0.13f, 0.018f, 0.02f)
+            };
+
             var objectTypes = new[]
             {
                 new InteractionObjectTypeMaster(1, InteractionObjectKind.Hand, "hand", new Vector2(0.18f, 0.14f), 0.08f, 1, new Color(0.35f, 0.42f, 1f, 0.6f)),
@@ -604,6 +665,7 @@ namespace LittlePeopleWorld.Master
                 new MasterTable<InteractionObjectTypeMaster>(objectTypes, x => x.Id),
                 new MasterTable<InteractionFieldMaster>(fields, x => x.Id),
                 new MasterTable<WalkableSurfaceMaster>(walkableSurfaces, x => x.Id),
+                new MasterTable<RainbowMaster>(rainbows, x => x.Id),
                 new MasterTable<AmbientObjectTypeMaster>(ambientObjectTypes, x => x.Id),
                 new MasterTable<VisualEffectMaster>(visualEffects, x => x.Id),
                 new MasterTable<SoundCueMaster>(soundCues, x => x.Id),

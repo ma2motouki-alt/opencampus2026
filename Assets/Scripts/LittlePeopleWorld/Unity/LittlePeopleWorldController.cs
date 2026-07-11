@@ -46,6 +46,7 @@ namespace LittlePeopleWorld.Unity
         readonly Dictionary<int, PropObstacleView> propObstacleViews = new();
         readonly Dictionary<int, AmbientObjectView> ambientObjectViews = new();
         readonly Dictionary<int, VisualEffectView> visualEffectViews = new();
+        readonly Dictionary<int, RainbowView> rainbowViews = new();
         readonly HashSet<Guid> plantLookPausedPersonIds = new();
         readonly HashSet<LeafHangSlot> occupiedLeafHangSlots = new();
 
@@ -59,6 +60,7 @@ namespace LittlePeopleWorld.Unity
         Transform obstaclesRoot;
         Transform ambientRoot;
         Transform effectsRoot;
+        Transform rainbowRoot;
         IInteractionInputProvider activeInputProvider;
 
         public MasterDatabase Masters => masters;
@@ -84,6 +86,9 @@ namespace LittlePeopleWorld.Unity
             }
 
             world.SetDisplayAspect(mapper.WorldWidth / mapper.WorldHeight);
+            world.SetActiveBloomCount(
+                enableRecognitionMaskAnimation && maskAnimationController != null
+                    ? maskAnimationController.ActiveBloomCount : 0);
             world.SetMovementPausedLittlePeople(plantLookPausedPersonIds);
             var inputProvider = InputProvider;
             orchestrator.AdvanceFrame(Time.deltaTime, inputProvider?.InteractionObjects ?? Array.Empty<InteractionObject>());
@@ -93,6 +98,7 @@ namespace LittlePeopleWorld.Unity
             SyncLittlePeopleViews();
             SyncInteractionObjectViews();
             SyncWalkableSurfaceViews();
+            SyncRainbowViews();
             SyncPropObstacleViews();
             SyncAmbientObjectViews();
             SyncRecognitionMaskAnimation();
@@ -294,6 +300,7 @@ namespace LittlePeopleWorld.Unity
             obstaclesRoot = CreateRoot("Prop Obstacles");
             ambientRoot = CreateRoot("Ambient Objects");
             effectsRoot = CreateRoot("Visual Effects");
+            rainbowRoot = CreateRoot("Rainbows");
             EnsureRecognitionMaskAnimation();
             EnsureAudioController();
             BuildLittlePersonViews();
@@ -524,6 +531,28 @@ namespace LittlePeopleWorld.Unity
             }
 
             RemoveDeadAmbientViews(liveIds);
+        }
+
+        void SyncRainbowViews()
+        {
+            var liveIds = new HashSet<int>();
+
+            foreach (var rainbow in world.Rainbows)
+            {
+                liveIds.Add(rainbow.Id);
+                if (!rainbowViews.TryGetValue(rainbow.Id, out var view))
+                {
+                    var viewObject = new GameObject($"Rainbow {rainbow.Id}");
+                    viewObject.transform.SetParent(rainbowRoot, false);
+                    view = viewObject.AddComponent<RainbowView>();
+                    view.Initialize();
+                    rainbowViews.Add(rainbow.Id, view);
+                }
+
+                view.Render(rainbow, mapper);
+            }
+
+            RemoveDeadRainbowViews(liveIds);
         }
 
         void SyncVisualEffectViews()
@@ -777,6 +806,28 @@ namespace LittlePeopleWorld.Unity
                 ambientObjectViews.Remove(id);
             }
         }
+        void RemoveDeadRainbowViews(HashSet<int> liveIds)
+        {
+            var deadIds = new List<int>();
+            foreach (var pair in rainbowViews)
+            {
+                if (!liveIds.Contains(pair.Key))
+                {
+                    deadIds.Add(pair.Key);
+                }
+            }
+
+            foreach (var id in deadIds)
+            {
+                if (rainbowViews[id] != null)
+                {
+                    Destroy(rainbowViews[id].gameObject);
+                }
+
+                rainbowViews.Remove(id);
+            }
+        }
+
 
         void RemoveDeadVisualEffectViews(HashSet<int> liveIds)
         {

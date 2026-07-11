@@ -183,6 +183,22 @@ namespace LittlePeopleWorld.Unity
         int rainOcclusionVisualClippedColumnsThisFrame;
 
         public bool HasActivePlants => plants.Count > 0;
+        public int ActiveBloomCount
+        {
+            get
+            {
+                var count = 0;
+                foreach (var plant in plants)
+                {
+                    if (plant.IsBloomable)
+                    {
+                        count++;
+                    }
+                }
+
+                return count;
+            }
+        }
 
         public int PlantSpawnSequence { get; private set; }
         public int PlantBloomSequence { get; private set; }

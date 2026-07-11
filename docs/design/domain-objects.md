@@ -9,7 +9,8 @@
 | `LittlePersonBehaviorState` | Current movement and emotional state. |
 | `InteractionObject` | Runtime input object from mouse or UDP RealSense. |
 | `InteractionField` | Reaction field generated from an input object. |
-| `WalkableSurface` | Walkable rule generated from a `BarProp`. |
+| `WalkableSurface` | Line or polyline walking rule generated from a `BarProp` or rainbow. |
+| `RainbowInstance` | Temporary curved world object created by bloom and distant-rain conditions. |
 | `PropObstacle` | Blocking prop body generated from a `BarProp`. |
 | `AmbientObject` | World-owned cloud or star. |
 | `VisualEffectInstance` | Runtime visual effect such as rain or star burst. |

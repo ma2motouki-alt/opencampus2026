@@ -58,7 +58,7 @@ The current practical setup assumes a mostly top-down / front-view camera, so `M
 `World.SetInteractionObjects` derives runtime objects from the current input list every frame.
 
 - `InteractionField[]`: reaction fields for hand, round prop, and primitive fallback.
-- `WalkableSurface[]`: walkable prop rules. Current bar surfaces are generated from the real visible rectangle edge.
+- `WalkableSurface[]`: line or polyline rules generated from visible bar edges and active rainbow curves.
 - `PropObstacle[]`: blocking prop bodies so edge walkers turn around instead of passing through a non-walkable side.
 
 These are not sent over UDP. They are generated inside Unity.
