@@ -24,7 +24,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float plantLookCooldownSeconds = 2.0f;
 
         [Header("Leaf Hang")]
-        [SerializeField] Vector2 leafHangDurationSeconds = new Vector2(1.2f, 2.2f);
+        [SerializeField] Vector2 leafHangDurationSeconds = new Vector2(10f, 20f);
         [SerializeField] float leafHangCooldownSeconds = 2.5f;
         [SerializeField] float leafHangFrameSeconds = 0.18f;
         [SerializeField] float leafHangSpriteDownOffsetRatio = 0.72f;
