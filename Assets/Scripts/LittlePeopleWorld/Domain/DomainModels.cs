@@ -2293,15 +2293,7 @@ namespace LittlePeopleWorld.Domain
                 }
             }
 
-            switch (index % 3)
-            {
-                case 0:
-                    return new Vector2(0.54f, 0.08f);
-                case 1:
-                    return new Vector2(0.90f, 0.45f);
-                default:
-                    return new Vector2(0.18f, 0.72f);
-            }
+            return new Vector2(0.84f, 0.12f);
         }
 
         static Vector2 AmbientVelocity(Vector2 baseVelocity, int index)

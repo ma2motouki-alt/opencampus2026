@@ -38,6 +38,8 @@ namespace LittlePeopleWorld.Unity
         float plantLookTimer;
         float plantLookCooldownTimer;
         bool plantLookLeft;
+        bool handLookLeft;
+        bool wasLookingAtHand;
         int plantLookTargetId = -1;
         float leafHangTimer;
         float leafHangCooldownTimer;
@@ -111,6 +113,15 @@ namespace LittlePeopleWorld.Unity
             var isDroppingFromLeaf = leafDropTimer > 0f;
             var isHangingFromLeaf = leafHangTimer > 0f;
             var isLookingAtPlant = plantLookTimer > 0f && !isHangingFromLeaf && !isDroppingFromLeaf;
+            var isLookingAtHand = !isLookingAtPlant &&
+                                  person.CurrentBehavior == LittlePersonBehaviorKind.EdgeWalk &&
+                                  person.Emotion == LittlePersonEmotion.Startled;
+            if (isLookingAtHand && !wasLookingAtHand)
+            {
+                handLookLeft = ShouldFlipX(person);
+            }
+
+            wasLookingAtHand = isLookingAtHand;
             transform.position = isDroppingFromLeaf
                 ? LeafDropWorldPosition()
                 : isHangingFromLeaf ? leafHangWorldPosition : baseWorldPosition;
@@ -120,12 +131,15 @@ namespace LittlePeopleWorld.Unity
                 ? sprites.HangFrame(CurrentLeafHangFrameIndex(), leafHangLeft)
                 : isLookingAtPlant
                     ? (plantLookLeft ? sprites.LookLeft : sprites.LookRight)
-                    : sprites.WalkFrame(CurrentFrameIndex(person), ShouldAnimate(person));
+                    : isLookingAtHand
+                        ? (handLookLeft ? sprites.LookLeft : sprites.LookRight)
+                        : sprites.WalkFrame(CurrentFrameIndex(person), ShouldAnimate(person));
             var hasSprite = sprite != null;
 
             spriteRenderer.sprite = hasSprite ? sprite : RuntimeSpriteFactory.Circle;
             spriteRenderer.color = hasSprite ? Color.white : archetype.BodyColor;
-            spriteRenderer.flipX = !isLookingAtPlant && !isHangingFromLeaf && !isDroppingFromLeaf && flipAlongMovement && ShouldFlipX(person);
+            spriteRenderer.flipX = !isLookingAtPlant && !isLookingAtHand && !isHangingFromLeaf && !isDroppingFromLeaf &&
+                                   flipAlongMovement && ShouldFlipX(person);
 
             var pulse = person.Emotion == LittlePersonEmotion.Startled
                 ? 1f + startledPulseScale * (0.5f + 0.5f * Mathf.Sin((Time.time + animationSeed) * 14f))

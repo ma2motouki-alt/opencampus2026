@@ -8,6 +8,7 @@ namespace LittlePeopleWorld.Unity
     public sealed class AmbientObjectView : MonoBehaviour
     {
         readonly List<SpriteRenderer> cloudRenderers = new();
+        readonly List<SpriteRenderer> sunRayRenderers = new();
         SpriteRenderer bodyRenderer;
         SpriteRenderer glowRenderer;
         SpriteRenderer contactRenderer;
@@ -23,6 +24,11 @@ namespace LittlePeopleWorld.Unity
             for (var i = 0; i < 5; i++)
             {
                 cloudRenderers.Add(CreateRenderer($"Cloud {i + 1}", RuntimeSpriteFactory.Circle, 2));
+            }
+
+            for (var i = 0; i < 8; i++)
+            {
+                sunRayRenderers.Add(CreateRenderer($"Sun Ray {i + 1}", RuntimeSpriteFactory.Circle, 1));
             }
         }
 
@@ -49,13 +55,18 @@ namespace LittlePeopleWorld.Unity
             }
             else
             {
-                RenderStar(ambientObject, typeMaster, mapper);
+                RenderSun(ambientObject, typeMaster, mapper);
             }
         }
 
         void RenderCloud(AmbientObject ambientObject, AmbientObjectTypeMaster typeMaster, NormalizedScreenMapper mapper)
         {
             bodyRenderer.enabled = false;
+            foreach (var renderer in sunRayRenderers)
+            {
+                renderer.enabled = false;
+            }
+
 
             var baseScale = mapper.ToWorldScale(ambientObject.Size);
             var color = typeMaster.Color;
@@ -82,7 +93,7 @@ namespace LittlePeopleWorld.Unity
             SetCloudPart(4, new Vector2(-0.18f, 0.16f), new Vector2(0.44f, 0.38f), baseScale);
         }
 
-        void RenderStar(AmbientObject ambientObject, AmbientObjectTypeMaster typeMaster, NormalizedScreenMapper mapper)
+        void RenderSun(AmbientObject ambientObject, AmbientObjectTypeMaster typeMaster, NormalizedScreenMapper mapper)
         {
             foreach (var renderer in cloudRenderers)
             {
@@ -98,17 +109,30 @@ namespace LittlePeopleWorld.Unity
             }
 
             bodyRenderer.enabled = true;
-            bodyRenderer.sprite = RuntimeSpriteFactory.Star;
+            bodyRenderer.sprite = RuntimeSpriteFactory.Circle;
             bodyRenderer.transform.localPosition = Vector3.zero;
-            bodyRenderer.transform.localScale = scale;
+            bodyRenderer.transform.localScale = scale * 0.72f;
             bodyRenderer.color = color;
 
-            var pulse = 1f + Mathf.Sin(Time.time * 3.4f + ambientObject.Id) * 0.08f;
+            var rayColor = Color.Lerp(color, Color.white, 0.28f);
+            for (var i = 0; i < sunRayRenderers.Count; i++)
+            {
+                var angleDegrees = i * 360f / sunRayRenderers.Count;
+                var direction = Quaternion.Euler(0f, 0f, angleDegrees) * Vector3.up;
+                var ray = sunRayRenderers[i];
+                ray.enabled = true;
+                ray.transform.localPosition = direction * scale.x * 0.62f;
+                ray.transform.localScale = new Vector3(scale.x * 0.12f, scale.y * 0.42f, 1f);
+                ray.transform.localRotation = Quaternion.FromToRotation(Vector3.up, direction);
+                ray.color = rayColor;
+            }
+
+            var pulse = 1f + Mathf.Sin(Time.time * 2.0f + ambientObject.Id) * 0.04f;
             var glowColor = Color.Lerp(typeMaster.Color, Color.white, 0.6f);
-            glowColor.a = ambientObject.State == AmbientObjectState.Reacting ? 0.42f : 0.18f;
+            glowColor.a = ambientObject.State == AmbientObjectState.Reacting ? 0.34f : 0.16f;
             glowRenderer.enabled = true;
             glowRenderer.sprite = RuntimeSpriteFactory.Circle;
-            glowRenderer.transform.localScale = scale * 1.8f * pulse;
+            glowRenderer.transform.localScale = scale * 2.0f * pulse;
             glowRenderer.color = glowColor;
         }
 
