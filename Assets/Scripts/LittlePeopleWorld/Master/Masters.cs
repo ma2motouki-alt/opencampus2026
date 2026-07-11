@@ -572,7 +572,7 @@ namespace LittlePeopleWorld.Master
             var ambientObjectTypes = new[]
             {
                 new AmbientObjectTypeMaster(1, AmbientObjectKind.Cloud, "drifting cloud", new Vector2(0.095f, 0.05f), new Vector2(0.014f, 0.003f), 0.075f, new Color(0.86f, 0.95f, 1f, 0.78f), 4, 0.18f, 0.38f),
-                new AmbientObjectTypeMaster(2, AmbientObjectKind.Star, "spark star", new Vector2(0.06f, 0.06f), new Vector2(0.01f, 0.006f), 0.085f, new Color(1f, 0.94f, 0.36f, 0.9f), 5)
+                new AmbientObjectTypeMaster(2, AmbientObjectKind.Star, "fixed sun", new Vector2(0.08f, 0.08f), Vector2.zero, 0.085f, new Color(1f, 0.84f, 0.20f, 0.95f), 5)
             };
 
             var visualEffects = new[]
@@ -592,7 +592,7 @@ namespace LittlePeopleWorld.Master
 //2.0fは雨の継続時間
             var tuning = new[]
             {
-                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 2, 2, 2.0f, 1.4f, 1.1f)
+                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 3, 1, 2.0f, 1.4f, 1.1f)
             };
 
             return new MasterDatabase(
