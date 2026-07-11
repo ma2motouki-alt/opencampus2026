@@ -6,6 +6,33 @@ using UnityEngine;
 
 namespace LittlePeopleWorld.Unity
 {
+    public readonly struct LeafHangSlot : IEquatable<LeafHangSlot>
+    {
+        public LeafHangSlot(int plantId, int leafIndex)
+        {
+            PlantId = plantId;
+            LeafIndex = leafIndex;
+        }
+
+        public int PlantId { get; }
+        public int LeafIndex { get; }
+
+        public bool Equals(LeafHangSlot other)
+        {
+            return PlantId == other.PlantId && LeafIndex == other.LeafIndex;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LeafHangSlot other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return unchecked((PlantId * 397) ^ LeafIndex);
+        }
+    }
+
     public sealed class WorldSpaceMaskAnimationController : MonoBehaviour
     {
         const int CellsX = 16;
@@ -223,12 +250,15 @@ namespace LittlePeopleWorld.Unity
             EnsureRuntime();
         }
 
-        public bool TryGetHighestLeafHangTarget(
+        public bool TryGetHighestAvailableLeafHangTarget(
             int plantId,
             Vector3 littlePersonWorldPosition,
+            ISet<LeafHangSlot> occupiedLeafSlots,
+            out LeafHangSlot selectedSlot,
             out Vector3 hangWorldPosition,
             out bool hangLeft)
         {
+            selectedSlot = default;
             hangWorldPosition = default;
             hangLeft = false;
             if (mapper == null || plantId < 0 || plants.Count == 0)
@@ -236,7 +266,6 @@ namespace LittlePeopleWorld.Unity
                 return false;
             }
 
-            var worldUnitsPerMaskPx = mapper.WorldHeight / Mathf.Max(1f, MaskH - 1f);
             var highestWorldY = float.NegativeInfinity;
             var found = false;
 
@@ -247,36 +276,22 @@ namespace LittlePeopleWorld.Unity
                     continue;
                 }
 
-                var rootWorldPosition = MaskToWorld(plant.Position);
-                var bloomWorldPosition = MaskToWorld(plant.BloomPosition);
-                var bloomLocalPosition = bloomWorldPosition - rootWorldPosition;
                 for (var i = 0; i < Mathf.Max(0, plantLeafCount); i++)
                 {
-                    if (!TryGetLeafTargetInfo(
-                            i,
-                            plantLeafCount,
-                            bloomLocalPosition,
-                            worldUnitsPerMaskPx,
-                            plantLeafLengthPx,
-                            plantLeafWidthPx,
-                            plantLeafStartRatio,
-                            plantLeafEndRatio,
-                            plantLeafAngleDegrees,
-                            out var leaf))
+                    var slot = new LeafHangSlot(plant.Id, i);
+                    if ((occupiedLeafSlots != null && occupiedLeafSlots.Contains(slot)) ||
+                        !TryGetLeafHangWorldPosition(plant, i, out var candidate))
                     {
                         continue;
                     }
 
-                    var candidate = rootWorldPosition +
-                                    leaf.LocalPosition +
-                                    leaf.Direction * leaf.LengthWorld * leaf.Scale * 0.48f +
-                                    Vector3.down * Mathf.Max(0f, leafHangOffsetPx) * worldUnitsPerMaskPx;
                     if (candidate.y <= highestWorldY)
                     {
                         continue;
                     }
 
                     highestWorldY = candidate.y;
+                    selectedSlot = slot;
                     hangWorldPosition = candidate;
                     hangLeft = littlePersonWorldPosition.x < candidate.x;
                     found = true;
@@ -288,22 +303,56 @@ namespace LittlePeopleWorld.Unity
             return found;
         }
 
-        public bool IsPlantAlive(int plantId)
+        public bool TryGetLeafHangTarget(int plantId, int leafIndex, out Vector3 hangWorldPosition)
         {
-            if (plantId < 0)
+            hangWorldPosition = default;
+            if (mapper == null || plantId < 0 || leafIndex < 0)
             {
                 return false;
             }
 
             foreach (var plant in plants)
             {
-                if (plant.Id == plantId)
+                if (plant.Id != plantId)
                 {
-                    return plant.CurrentStage != PlantStage.Dead;
+                    continue;
                 }
+
+                return plant.CurrentStage != PlantStage.Dead &&
+                       plant.HeightPx > 2f &&
+                       TryGetLeafHangWorldPosition(plant, leafIndex, out hangWorldPosition);
             }
 
             return false;
+        }
+
+        bool TryGetLeafHangWorldPosition(PlantModel plant, int leafIndex, out Vector3 hangWorldPosition)
+        {
+            hangWorldPosition = default;
+            var worldUnitsPerMaskPx = mapper.WorldHeight / Mathf.Max(1f, MaskH - 1f);
+            var rootWorldPosition = MaskToWorld(plant.Position);
+            var bloomWorldPosition = MaskToWorld(plant.BloomPosition);
+            var bloomLocalPosition = bloomWorldPosition - rootWorldPosition;
+            if (!TryGetLeafTargetInfo(
+                    leafIndex,
+                    plantLeafCount,
+                    bloomLocalPosition,
+                    worldUnitsPerMaskPx,
+                    plantLeafLengthPx,
+                    plantLeafWidthPx,
+                    plantLeafStartRatio,
+                    plantLeafEndRatio,
+                    plantLeafAngleDegrees,
+                    out var leaf))
+            {
+                return false;
+            }
+
+            hangWorldPosition = rootWorldPosition +
+                                leaf.LocalPosition +
+                                leaf.Direction * leaf.LengthWorld * leaf.Scale * 0.48f +
+                                Vector3.down * Mathf.Max(0f, leafHangOffsetPx) * worldUnitsPerMaskPx;
+            return true;
         }
 
         public bool IsInputNearWorldPosition(

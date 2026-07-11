@@ -47,6 +47,7 @@ namespace LittlePeopleWorld.Unity
         readonly Dictionary<int, AmbientObjectView> ambientObjectViews = new();
         readonly Dictionary<int, VisualEffectView> visualEffectViews = new();
         readonly HashSet<Guid> plantLookPausedPersonIds = new();
+        readonly HashSet<LeafHangSlot> occupiedLeafHangSlots = new();
 
         MasterDatabase masters;
         World world;
@@ -330,6 +331,16 @@ namespace LittlePeopleWorld.Unity
         void SyncLittlePeopleViews()
         {
             plantLookPausedPersonIds.Clear();
+            occupiedLeafHangSlots.Clear();
+            foreach (var existingView in littlePersonViews)
+            {
+                if (existingView != null && existingView.IsHangingFromLeaf)
+                {
+                    occupiedLeafHangSlots.Add(new LeafHangSlot(
+                        existingView.HangingPlantId,
+                        existingView.HangingLeafIndex));
+                }
+            }
 
             if (maskAnimationController != null)
             {
@@ -361,14 +372,17 @@ namespace LittlePeopleWorld.Unity
                         littlePersonLeafHangTouchRadius,
                         hasDevelopmentPersonTouch,
                         developmentPersonTouchWorldPosition);
+                var leafHangSlot = default(LeafHangSlot);
                 var leafHangTargetWorld = Vector3.zero;
                 var leafHangLeft = false;
                 var hasLeafHangTarget =
                     personTouched &&
                     maskAnimationController != null &&
-                    maskAnimationController.TryGetHighestLeafHangTarget(
+                    maskAnimationController.TryGetHighestAvailableLeafHangTarget(
                         view.PlantLookTargetId,
                         view.TouchWorldPosition,
+                        occupiedLeafHangSlots,
+                        out leafHangSlot,
                         out leafHangTargetWorld,
                         out leafHangLeft);
                 var leafDropTouched =
@@ -379,9 +393,14 @@ namespace LittlePeopleWorld.Unity
                         littlePersonLeafDropTouchRadius,
                         hasDevelopmentPersonTouch,
                         developmentPersonTouchWorldPosition);
-                var hangingPlantAlive =
+                var currentLeafHangWorld = Vector3.zero;
+                var hangingLeafTargetAvailable =
                     !view.IsHangingFromLeaf ||
-                    (maskAnimationController != null && maskAnimationController.IsPlantAlive(view.HangingPlantId));
+                    (maskAnimationController != null &&
+                     maskAnimationController.TryGetLeafHangTarget(
+                         view.HangingPlantId,
+                         view.HangingLeafIndex,
+                         out currentLeafHangWorld));
                 view.Render(
                     person,
                     archetype,
@@ -390,14 +409,21 @@ namespace LittlePeopleWorld.Unity
                     plantLookTargetId,
                     plantLookTargetWorld,
                     hasLeafHangTarget,
-                    view.PlantLookTargetId,
+                    leafHangSlot.PlantId,
+                    leafHangSlot.LeafIndex,
                     leafHangTargetWorld,
                     leafHangLeft,
                     leafDropTouched,
-                    hangingPlantAlive);
+                    hangingLeafTargetAvailable,
+                    currentLeafHangWorld);
                 if (view.IsPlantInteractionLocked)
                 {
                     plantLookPausedPersonIds.Add(person.Id);
+                }
+
+                if (view.IsHangingFromLeaf)
+                {
+                    occupiedLeafHangSlots.Add(new LeafHangSlot(view.HangingPlantId, view.HangingLeafIndex));
                 }
             }
         }
