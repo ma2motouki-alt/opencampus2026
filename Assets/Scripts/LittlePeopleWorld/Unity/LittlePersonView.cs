@@ -38,10 +38,12 @@ namespace LittlePeopleWorld.Unity
         float plantLookTimer;
         float plantLookCooldownTimer;
         bool plantLookLeft;
+        int plantLookTargetId = -1;
         float leafHangTimer;
         float leafHangCooldownTimer;
         bool leafHangLeft;
         Vector3 leafHangWorldPosition;
+        int hangingPlantId = -1;
         float leafDropTimer;
         Vector3 leafDropStartWorldPosition;
         Vector3 leafDropEndWorldPosition;
@@ -54,6 +56,11 @@ namespace LittlePeopleWorld.Unity
         public bool IsHangingFromLeaf => leafHangTimer > 0f;
         public bool IsDroppingFromLeaf => leafDropTimer > 0f;
         public bool IsPlantInteractionLocked => IsLookingAtPlant || IsHangingFromLeaf || IsDroppingFromLeaf;
+        public int PlantLookTargetId => IsLookingAtPlant ? plantLookTargetId : -1;
+        public int HangingPlantId => IsHangingFromLeaf ? hangingPlantId : -1;
+        public Vector3 TouchWorldPosition => spriteRenderer != null && spriteRenderer.sprite != null
+            ? spriteRenderer.bounds.center
+            : transform.position;
         public Vector3 LeafInteractionWorldPosition => IsDroppingFromLeaf
             ? LeafDropWorldPosition()
             : IsHangingFromLeaf ? leafHangWorldPosition : transform.position;
@@ -70,11 +77,14 @@ namespace LittlePeopleWorld.Unity
             LittlePersonArchetypeMaster archetype,
             NormalizedScreenMapper mapper,
             bool plantLookCandidate = false,
+            int plantLookCandidateId = -1,
             Vector3 plantLookTargetWorld = default,
             bool leafHangCandidate = false,
+            int leafHangPlantId = -1,
             Vector3 leafHangTargetWorld = default,
             bool leafHangLeftCandidate = false,
-            bool leafDropTouched = false)
+            bool leafDropTouched = false,
+            bool hangingPlantAlive = true)
         {
             var baseWorldPosition = mapper.ToWorld(person.Position) + EdgeVisualOffset(person, mapper);
             var unit = mapper.ToWorldRadius(archetype.Size);
@@ -83,11 +93,14 @@ namespace LittlePeopleWorld.Unity
                 person,
                 baseWorldPosition,
                 plantLookCandidate,
+                plantLookCandidateId,
                 plantLookTargetWorld,
                 leafHangCandidate,
+                leafHangPlantId,
                 leafHangTargetWorld,
                 leafHangLeftCandidate,
-                leafDropTouched);
+                leafDropTouched,
+                hangingPlantAlive);
 
             var isDroppingFromLeaf = leafDropTimer > 0f;
             var isHangingFromLeaf = leafHangTimer > 0f;
@@ -138,11 +151,14 @@ namespace LittlePeopleWorld.Unity
             LittlePerson person,
             Vector3 baseWorldPosition,
             bool plantLookCandidate,
+            int plantLookCandidateId,
             Vector3 plantLookTargetWorld,
             bool leafHangCandidate,
+            int leafHangPlantId,
             Vector3 leafHangTargetWorld,
             bool leafHangLeftCandidate,
-            bool leafDropTouched)
+            bool leafDropTouched,
+            bool hangingPlantAlive)
         {
             var deltaTime = Mathf.Max(0f, Time.deltaTime);
             leafHangCooldownTimer = Mathf.Max(0f, leafHangCooldownTimer - deltaTime);
@@ -153,6 +169,7 @@ namespace LittlePeopleWorld.Unity
                 if (leafDropTimer <= 0f)
                 {
                     leafHangCooldownTimer = leafHangCooldownSeconds;
+                    hangingPlantId = -1;
                 }
 
                 return;
@@ -161,6 +178,13 @@ namespace LittlePeopleWorld.Unity
             if (leafHangTimer > 0f)
             {
                 plantLookTimer = 0f;
+                plantLookTargetId = -1;
+                if (!hangingPlantAlive)
+                {
+                    StartLeafDrop(baseWorldPosition);
+                    return;
+                }
+
                 leafDropRetouchTimer = Mathf.Max(0f, leafDropRetouchTimer - deltaTime);
                 if (!leafDropTouched)
                 {
@@ -180,6 +204,7 @@ namespace LittlePeopleWorld.Unity
                 if (leafHangTimer <= 0f)
                 {
                     leafHangCooldownTimer = leafHangCooldownSeconds;
+                    hangingPlantId = -1;
                 }
 
                 return;
@@ -187,12 +212,16 @@ namespace LittlePeopleWorld.Unity
 
             plantLookTimer = Mathf.Max(0f, plantLookTimer - deltaTime);
             plantLookCooldownTimer = Mathf.Max(0f, plantLookCooldownTimer - deltaTime);
+            if (plantLookTimer <= 0f)
+            {
+                plantLookTargetId = -1;
+            }
 
             if (plantLookTimer > 0f)
             {
                 if (leafHangCandidate && leafHangCooldownTimer <= 0f)
                 {
-                    StartLeafHang(leafHangTargetWorld, leafHangLeftCandidate);
+                    StartLeafHang(leafHangPlantId, leafHangTargetWorld, leafHangLeftCandidate);
                 }
 
                 return;
@@ -211,6 +240,7 @@ namespace LittlePeopleWorld.Unity
                 return;
             }
 
+            plantLookTargetId = plantLookCandidateId;
             plantLookLeft = IsLookingFromWorldLeft(baseWorldPosition, plantLookTargetWorld);
             var minDuration = Mathf.Max(0.05f, Mathf.Min(plantLookDurationSeconds.x, plantLookDurationSeconds.y));
             var maxDuration = Mathf.Max(minDuration, Mathf.Max(plantLookDurationSeconds.x, plantLookDurationSeconds.y));
@@ -218,8 +248,9 @@ namespace LittlePeopleWorld.Unity
             plantLookCooldownTimer = plantLookCooldownSeconds;
         }
 
-        void StartLeafHang(Vector3 targetWorldPosition, bool useLeftSprite)
+        void StartLeafHang(int plantId, Vector3 targetWorldPosition, bool useLeftSprite)
         {
+            hangingPlantId = plantId;
             leafHangWorldPosition = targetWorldPosition;
             leafHangLeft = useLeftSprite;
             var minDuration = Mathf.Max(0.05f, Mathf.Min(leafHangDurationSeconds.x, leafHangDurationSeconds.y));
@@ -227,6 +258,7 @@ namespace LittlePeopleWorld.Unity
             leafHangTimer = Random.Range(minDuration, maxDuration);
             leafDropTimer = 0f;
             plantLookTimer = 0f;
+            plantLookTargetId = -1;
             leafDropRetouchTimer = Mathf.Max(0f, leafDropRetouchArmSeconds);
             leafDropTouchWasPresent = true;
         }
@@ -236,6 +268,7 @@ namespace LittlePeopleWorld.Unity
             leafDropStartWorldPosition = leafHangWorldPosition;
             leafDropEndWorldPosition = endWorldPosition;
             leafDropTimer = Mathf.Max(0.05f, leafDropDurationSeconds);
+            hangingPlantId = -1;
             leafHangTimer = 0f;
             plantLookTimer = 0f;
             leafDropTouchWasPresent = false;

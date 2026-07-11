@@ -103,12 +103,11 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float plantLeafWidthPx = 4.5f;
         [SerializeField] float plantLeafStartRatio = 0.24f;
         [SerializeField] float plantLeafEndRatio = 0.72f;
-        [SerializeField] float plantLeafAngleDegrees = 42f;
+        [SerializeField] float plantLeafAngleDegrees = 80f;
         [SerializeField, Range(0f, 1f)] float plantLeafAlpha = 0.82f;
         [SerializeField, Range(0f, 1f)] float plantLeafVeinAlpha = 0.62f;
 
         [Header("Little Person Leaf Hang")]
-        [SerializeField] float leafTouchMaskRadiusPx = 8f;
         [SerializeField] float leafHangOffsetPx = 3f;
 
         [Header("Bloom Attraction")]
@@ -175,8 +174,9 @@ namespace LittlePeopleWorld.Unity
                 : 1f;
         }
 
-        public bool TryGetNearestPlantLookTarget(Vector3 worldPosition, float radiusWorld, out Vector3 plantWorldPosition)
+        public bool TryGetNearestPlantLookTarget(Vector3 worldPosition, float radiusWorld, out int plantId, out Vector3 plantWorldPosition)
         {
+            plantId = -1;
             plantWorldPosition = default;
             if (mapper == null || plants.Count == 0 || radiusWorld <= 0f)
             {
@@ -204,6 +204,7 @@ namespace LittlePeopleWorld.Unity
                 }
 
                 bestDistanceSqr = distanceSqr;
+                plantId = plant.Id;
                 plantWorldPosition = bloomWorldPosition;
                 found = true;
             }
@@ -222,31 +223,26 @@ namespace LittlePeopleWorld.Unity
             EnsureRuntime();
         }
 
-        public bool TryGetNearestLeafHangTarget(
-            Vector3 worldPosition,
-            float searchRadiusWorld,
-            IReadOnlyList<InteractionObject> interactionObjects,
-            bool hasDevelopmentTouch,
-            Vector3 developmentTouchWorldPosition,
+        public bool TryGetHighestLeafHangTarget(
+            int plantId,
+            Vector3 littlePersonWorldPosition,
             out Vector3 hangWorldPosition,
             out bool hangLeft)
         {
             hangWorldPosition = default;
             hangLeft = false;
-            if (mapper == null || plants.Count == 0 || searchRadiusWorld <= 0f)
+            if (mapper == null || plantId < 0 || plants.Count == 0)
             {
                 return false;
             }
 
             var worldUnitsPerMaskPx = mapper.WorldHeight / Mathf.Max(1f, MaskH - 1f);
-            var touchRadiusWorld = Mathf.Max(0.01f, leafTouchMaskRadiusPx * worldUnitsPerMaskPx);
-            var searchRadiusSqr = searchRadiusWorld * searchRadiusWorld;
-            var bestDistanceSqr = searchRadiusSqr;
+            var highestWorldY = float.NegativeInfinity;
             var found = false;
 
             foreach (var plant in plants)
             {
-                if (plant.CurrentStage == PlantStage.Dead || plant.HeightPx <= 2f)
+                if (plant.Id != plantId || plant.CurrentStage == PlantStage.Dead || plant.HeightPx <= 2f)
                 {
                     continue;
                 }
@@ -275,29 +271,39 @@ namespace LittlePeopleWorld.Unity
                                     leaf.LocalPosition +
                                     leaf.Direction * leaf.LengthWorld * leaf.Scale * 0.48f +
                                     Vector3.down * Mathf.Max(0f, leafHangOffsetPx) * worldUnitsPerMaskPx;
-                    var distanceSqr = (worldPosition - candidate).sqrMagnitude;
-                    if (distanceSqr > bestDistanceSqr)
+                    if (candidate.y <= highestWorldY)
                     {
                         continue;
                     }
 
-                    var touchedByInput = IsInputNearWorldPosition(interactionObjects, candidate, touchRadiusWorld);
-                    var touchedByDevelopmentClick =
-                        hasDevelopmentTouch &&
-                        (developmentTouchWorldPosition - candidate).sqrMagnitude <= touchRadiusWorld * touchRadiusWorld;
-                    if (!touchedByInput && !touchedByDevelopmentClick)
-                    {
-                        continue;
-                    }
-
-                    bestDistanceSqr = distanceSqr;
+                    highestWorldY = candidate.y;
                     hangWorldPosition = candidate;
-                    hangLeft = worldPosition.x < candidate.x;
+                    hangLeft = littlePersonWorldPosition.x < candidate.x;
                     found = true;
                 }
+
+                break;
             }
 
             return found;
+        }
+
+        public bool IsPlantAlive(int plantId)
+        {
+            if (plantId < 0)
+            {
+                return false;
+            }
+
+            foreach (var plant in plants)
+            {
+                if (plant.Id == plantId)
+                {
+                    return plant.CurrentStage != PlantStage.Dead;
+                }
+            }
+
+            return false;
         }
 
         public bool IsInputNearWorldPosition(

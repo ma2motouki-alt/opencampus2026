@@ -32,7 +32,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float littlePersonPlantLookRadius = 0.95f;
         [Header("Little Person Leaf Hang")]
         [SerializeField] bool enableLittlePersonLeafHang = true;
-        [SerializeField] float littlePersonLeafHangRadius = 1.0f;
+        [SerializeField] float littlePersonLeafHangTouchRadius = 0.45f;
         [SerializeField] float littlePersonLeafDropTouchRadius = 0.45f;
         [SerializeField] bool enableDevelopmentLeafHangClick = true;
         [Header("Development Rain")]
@@ -336,12 +336,14 @@ namespace LittlePeopleWorld.Unity
                 maskAnimationController.PrepareSpatialQueries(mapper);
             }
 
-            var hasDevelopmentLeafTouch = TryGetDevelopmentLeafTouchWorldPosition(out var developmentLeafTouchWorldPosition);
+            var hasDevelopmentPersonTouch = TryGetDevelopmentPersonTouchWorldPosition(out var developmentPersonTouchWorldPosition);
             for (var i = 0; i < world.LittlePeople.Count && i < littlePersonViews.Count; i++)
             {
                 var person = world.LittlePeople[i];
                 var archetype = masters.LittlePersonArchetypes.Get(person.ArchetypeId);
                 var personWorldPosition = mapper.ToWorld(person.Position);
+                var view = littlePersonViews[i];
+                var plantLookTargetId = -1;
                 var plantLookTargetWorld = Vector3.zero;
                 var hasPlantLookTarget =
                     enableLittlePersonPlantLook &&
@@ -349,36 +351,50 @@ namespace LittlePeopleWorld.Unity
                     maskAnimationController.TryGetNearestPlantLookTarget(
                         personWorldPosition,
                         littlePersonPlantLookRadius,
+                        out plantLookTargetId,
                         out plantLookTargetWorld);
-                var view = littlePersonViews[i];
+                var personTouched =
+                    enableLittlePersonLeafHang &&
+                    view.IsLookingAtPlant &&
+                    IsPlantInteractionTouched(
+                        view.TouchWorldPosition,
+                        littlePersonLeafHangTouchRadius,
+                        hasDevelopmentPersonTouch,
+                        developmentPersonTouchWorldPosition);
                 var leafHangTargetWorld = Vector3.zero;
                 var leafHangLeft = false;
                 var hasLeafHangTarget =
-                    enableLittlePersonLeafHang &&
-                    view.IsLookingAtPlant &&
+                    personTouched &&
                     maskAnimationController != null &&
-                    maskAnimationController.TryGetNearestLeafHangTarget(
-                        personWorldPosition,
-                        littlePersonLeafHangRadius,
-                        world.InteractionObjects,
-                        hasDevelopmentLeafTouch,
-                        developmentLeafTouchWorldPosition,
+                    maskAnimationController.TryGetHighestLeafHangTarget(
+                        view.PlantLookTargetId,
+                        view.TouchWorldPosition,
                         out leafHangTargetWorld,
                         out leafHangLeft);
                 var leafDropTouched =
                     enableLittlePersonLeafHang &&
                     view.IsHangingFromLeaf &&
-                    IsLeafDropTouched(view.LeafInteractionWorldPosition, hasDevelopmentLeafTouch, developmentLeafTouchWorldPosition);
+                    IsPlantInteractionTouched(
+                        view.TouchWorldPosition,
+                        littlePersonLeafDropTouchRadius,
+                        hasDevelopmentPersonTouch,
+                        developmentPersonTouchWorldPosition);
+                var hangingPlantAlive =
+                    !view.IsHangingFromLeaf ||
+                    (maskAnimationController != null && maskAnimationController.IsPlantAlive(view.HangingPlantId));
                 view.Render(
                     person,
                     archetype,
                     mapper,
                     hasPlantLookTarget,
+                    plantLookTargetId,
                     plantLookTargetWorld,
                     hasLeafHangTarget,
+                    view.PlantLookTargetId,
                     leafHangTargetWorld,
                     leafHangLeft,
-                    leafDropTouched);
+                    leafDropTouched,
+                    hangingPlantAlive);
                 if (view.IsPlantInteractionLocked)
                 {
                     plantLookPausedPersonIds.Add(person.Id);
@@ -571,11 +587,15 @@ namespace LittlePeopleWorld.Unity
             return InputProvider != null && InputProvider.DebugEnabled;
         }
 
-        bool IsLeafDropTouched(Vector3 leafInteractionWorldPosition, bool hasDevelopmentTouch, Vector3 developmentTouchWorldPosition)
+        bool IsPlantInteractionTouched(
+            Vector3 littlePersonWorldPosition,
+            float touchRadius,
+            bool hasDevelopmentTouch,
+            Vector3 developmentTouchWorldPosition)
         {
+            var safeTouchRadius = Mathf.Max(0f, touchRadius);
             if (hasDevelopmentTouch &&
-                (developmentTouchWorldPosition - leafInteractionWorldPosition).sqrMagnitude <=
-                littlePersonLeafDropTouchRadius * littlePersonLeafDropTouchRadius)
+                (developmentTouchWorldPosition - littlePersonWorldPosition).sqrMagnitude <= safeTouchRadius * safeTouchRadius)
             {
                 return true;
             }
@@ -583,11 +603,11 @@ namespace LittlePeopleWorld.Unity
             return maskAnimationController != null &&
                    maskAnimationController.IsInputNearWorldPosition(
                        world.InteractionObjects,
-                       leafInteractionWorldPosition,
-                       littlePersonLeafDropTouchRadius);
+                       littlePersonWorldPosition,
+                       safeTouchRadius);
         }
 
-        bool TryGetDevelopmentLeafTouchWorldPosition(out Vector3 worldPosition)
+        bool TryGetDevelopmentPersonTouchWorldPosition(out Vector3 worldPosition)
         {
             worldPosition = default;
             if (!enableDevelopmentLeafHangClick || !IsDevelopmentLeafHangClick() || targetCamera == null || mapper == null)
