@@ -38,12 +38,22 @@ Mouse / UDP RealSense
   -> Unity views and mask animation
 ```
 
+## Completed Structural Steps
+
+`DomainModels.cs` has been split by ownership without changing namespaces or public APIs:
+
+- `InteractionModels.cs`: input objects, interaction fields, and sensor frames.
+- `EffectModels.cs`: reaction and visual-effect instances.
+- `AmbientModels.cs`: clouds, the sun, and ambient runtime state.
+- `RainbowModels.cs`: rainbow lifecycle and rainbow walkable surfaces.
+- `LittlePerson.cs`: little-person state and movement rules.
+- `World.cs`: aggregate root and frame progression.
+
 ## Next Structural Steps
 
-1. Split `DomainModels.cs` by interaction, little-person, ambient, rainbow, and world ownership without changing behavior.
-2. Split `WorldSpaceMaskAnimationController` into recognition mask, fairy simulation, plant lifecycle, rain occlusion, and renderers.
-3. Move plant-look and leaf-hang timers out of `LittlePersonView` into a runtime state object.
-4. Split UDP transport, JSON parsing, and track state while keeping `IInteractionInputProvider` stable.
-5. Move frequently tuned visual values into dedicated settings assets after the runtime classes are separated.
+1. Split `WorldSpaceMaskAnimationController` into recognition mask, fairy simulation, plant lifecycle, rain occlusion, and renderers.
+2. Move plant-look and leaf-hang timers out of `LittlePersonView` into a runtime state object.
+3. Split UDP transport and track state while keeping `InteractionProtocolParser` and `IInteractionInputProvider` stable.
+4. Move frequently tuned visual values into dedicated settings assets after the runtime classes are separated.
 
 Each step must preserve the accepted baseline and pass C# compilation plus `python -m compileall python/realsense`.

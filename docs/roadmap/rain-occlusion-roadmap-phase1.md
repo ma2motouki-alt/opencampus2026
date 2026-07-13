@@ -94,7 +94,7 @@ if (!IsRainBlockedByMask(rainOrigin, landingPositionPx))
 ```text
 enableRainOcclusionByMask = true
 rainOcclusionProbeRadiusPx = 2
-rainOcclusionTopPaddingPx = 12
+rainOcclusionTopPaddingPx = 15
 showRainOcclusionDebug = false
 ```
 
