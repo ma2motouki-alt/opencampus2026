@@ -12,7 +12,6 @@ Mouse / UDP RealSense input
   -> World
     -> InteractionField[]
     -> WalkableSurface[]
-    -> PropObstacle[]
     -> LittlePerson[]
     -> AmbientObject[]
     -> VisualEffectInstance[]
@@ -28,7 +27,7 @@ Mouse / UDP RealSense input
 
 ### Mouse
 
-Mouse input is used for local development and fallback testing. It creates primitive hand, round, and bar objects.
+Mouse input is used for local development and fallback testing. It creates primitive hand and round objects. Mode `3` draws temporary mask strokes for visual debugging only.
 
 ### UDP RealSense
 
@@ -46,7 +45,6 @@ RealSense D435
   -> morphology open/close
   -> contour extraction
   -> contour simplification
-  -> optional bar classification
   -> normalized display mapping
   -> UDP JSON
 ```
@@ -58,8 +56,7 @@ The current practical setup assumes a mostly top-down / front-view camera, so `M
 `World.SetInteractionObjects` derives runtime objects from the current input list every frame.
 
 - `InteractionField[]`: reaction fields for hand, round prop, and primitive fallback.
-- `WalkableSurface[]`: line or polyline rules generated from visible bar edges and active rainbow curves.
-- `PropObstacle[]`: blocking prop bodies so edge walkers turn around instead of passing through a non-walkable side.
+- `WalkableSurface[]`: directed polyline paths generated only from active rainbow curves.
 
 These are not sent over UDP. They are generated inside Unity.
 

@@ -218,86 +218,6 @@ namespace LittlePeopleWorld.Master
         }
     }
 
-    public sealed class WalkableSurfaceMaster
-    {
-        public int Id { get; }
-        public string Name { get; }
-        public float AttachDistance { get; }
-        public float DetachDistance { get; }
-        public float SurfaceWalkSpeed { get; }
-        public float RideVelocityLimit { get; }
-        public float SurfaceWidth { get; }
-        public float BarVisualScale { get; }
-        public float TransferDurationSeconds { get; }
-        public float AttachProgressInset { get; }
-        public float ExitProgressInset { get; }
-        public float SurfaceExitDwellSeconds { get; }
-        public float SurfaceConnectionDistance { get; }
-        public float SurfaceConnectionTransferDurationSeconds { get; }
-        public float SurfaceConnectionCooldownSeconds { get; }
-        public float TipCrossDurationSeconds { get; }
-        public float ExitOppositeSidePadding { get; }
-        public float TwoSidedVerticalToleranceDegrees { get; }
-        public float AttachSideTolerance { get; }
-        public float BarObstaclePadding { get; }
-        public float EdgeBlockBackoffDistance { get; }
-        public float EdgeBlockCooldownSeconds { get; }
-        public float MinWalkDistance { get; }
-        public float MaxWalkDistance { get; }
-
-        public WalkableSurfaceMaster(
-            int id,
-            string name,
-            float attachDistance,
-            float detachDistance,
-            float surfaceWalkSpeed,
-            float rideVelocityLimit,
-            float surfaceWidth,
-            float barVisualScale,
-            float transferDurationSeconds,
-            float attachProgressInset,
-            float exitProgressInset,
-            float surfaceExitDwellSeconds,
-            float surfaceConnectionDistance,
-            float surfaceConnectionTransferDurationSeconds,
-            float surfaceConnectionCooldownSeconds,
-            float tipCrossDurationSeconds,
-            float exitOppositeSidePadding,
-            float twoSidedVerticalToleranceDegrees,
-            float attachSideTolerance,
-            float barObstaclePadding,
-            float edgeBlockBackoffDistance,
-            float edgeBlockCooldownSeconds,
-            float minWalkDistance,
-            float maxWalkDistance)
-        {
-            Id = id;
-            Name = name ?? throw new ArgumentNullException(nameof(name));
-            AttachDistance = Mathf.Max(0.001f, attachDistance);
-            DetachDistance = Mathf.Max(AttachDistance, detachDistance);
-            SurfaceWalkSpeed = Mathf.Max(0.001f, surfaceWalkSpeed);
-            RideVelocityLimit = Mathf.Max(0.001f, rideVelocityLimit);
-            SurfaceWidth = Mathf.Max(0.001f, surfaceWidth);
-            BarVisualScale = Mathf.Max(0.001f, barVisualScale);
-            TransferDurationSeconds = Mathf.Max(0.001f, transferDurationSeconds);
-            AttachProgressInset = Mathf.Clamp(attachProgressInset, 0f, 0.95f);
-            ExitProgressInset = Mathf.Clamp(exitProgressInset, 0f, 0.95f);
-            SurfaceExitDwellSeconds = Mathf.Max(0f, surfaceExitDwellSeconds);
-            SurfaceConnectionDistance = Mathf.Max(0.001f, surfaceConnectionDistance);
-            SurfaceConnectionTransferDurationSeconds = Mathf.Max(0.001f, surfaceConnectionTransferDurationSeconds);
-            SurfaceConnectionCooldownSeconds = Mathf.Max(0f, surfaceConnectionCooldownSeconds);
-            TipCrossDurationSeconds = Mathf.Max(0.001f, tipCrossDurationSeconds);
-            ExitOppositeSidePadding = Mathf.Max(0f, exitOppositeSidePadding);
-            TwoSidedVerticalToleranceDegrees = Mathf.Clamp(twoSidedVerticalToleranceDegrees, 0f, 90f);
-            AttachSideTolerance = Mathf.Max(0f, attachSideTolerance);
-            BarObstaclePadding = Mathf.Max(0f, barObstaclePadding);
-            EdgeBlockBackoffDistance = Mathf.Max(0f, edgeBlockBackoffDistance);
-            EdgeBlockCooldownSeconds = Mathf.Max(0f, edgeBlockCooldownSeconds);
-            MinWalkDistance = Mathf.Max(0.001f, minWalkDistance);
-            MaxWalkDistance = Mathf.Max(MinWalkDistance, maxWalkDistance);
-        }
-    }
-
     public sealed class RainbowMaster
     {
         public int Id { get; }
@@ -464,15 +384,9 @@ namespace LittlePeopleWorld.Master
         public float WorldEdgePadding { get; }
         public float InputHitPadding { get; }
         public float HandContourReactionPadding { get; }
-        public float EdgeAttachDistance { get; }
-        public float ClimbSpeed { get; }
-        public float BarTopDwellSeconds { get; }
-        public float BarSideWalkPadding { get; }
         public float FallDuration { get; }
         public float FallLateralDistance { get; }
         public float FallLaunchDistance { get; }
-        public float ClimbCooldownSeconds { get; }
-        public bool BarDragBlocksClimb { get; }
         public int AmbientCloudCount { get; }
         public int AmbientStarCount { get; }
         public float RainLingerSeconds { get; }
@@ -486,15 +400,9 @@ namespace LittlePeopleWorld.Master
             float worldEdgePadding,
             float inputHitPadding,
             float handContourReactionPadding,
-            float edgeAttachDistance,
-            float climbSpeed,
-            float barTopDwellSeconds,
-            float barSideWalkPadding,
             float fallDuration,
             float fallLateralDistance,
             float fallLaunchDistance,
-            float climbCooldownSeconds,
-            bool barDragBlocksClimb,
             int ambientCloudCount,
             int ambientStarCount,
             float rainLingerSeconds,
@@ -507,15 +415,9 @@ namespace LittlePeopleWorld.Master
             WorldEdgePadding = Mathf.Clamp01(worldEdgePadding);
             InputHitPadding = Mathf.Max(0f, inputHitPadding);
             HandContourReactionPadding = Mathf.Max(0f, handContourReactionPadding);
-            EdgeAttachDistance = Mathf.Max(0.001f, edgeAttachDistance);
-            ClimbSpeed = Mathf.Max(0.001f, climbSpeed);
-            BarTopDwellSeconds = Mathf.Max(0f, barTopDwellSeconds);
-            BarSideWalkPadding = Mathf.Max(0f, barSideWalkPadding);
             FallDuration = Mathf.Max(0.001f, fallDuration);
             FallLateralDistance = Mathf.Max(0f, fallLateralDistance);
             FallLaunchDistance = Mathf.Max(0f, fallLaunchDistance);
-            ClimbCooldownSeconds = Mathf.Max(0f, climbCooldownSeconds);
-            BarDragBlocksClimb = barDragBlocksClimb;
             AmbientCloudCount = Math.Max(0, ambientCloudCount);
             AmbientStarCount = Math.Max(0, ambientStarCount);
             RainLingerSeconds = Mathf.Max(0.01f, rainLingerSeconds);
@@ -533,7 +435,6 @@ namespace LittlePeopleWorld.Master
         public MasterTable<ReactionConditionMaster> ReactionConditions { get; }
         public MasterTable<InteractionObjectTypeMaster> InteractionObjectTypes { get; }
         public MasterTable<InteractionFieldMaster> InteractionFields { get; }
-        public MasterTable<WalkableSurfaceMaster> WalkableSurfaces { get; }
         public MasterTable<RainbowMaster> Rainbows { get; }
         public MasterTable<AmbientObjectTypeMaster> AmbientObjectTypes { get; }
         public MasterTable<VisualEffectMaster> VisualEffects { get; }
@@ -548,7 +449,6 @@ namespace LittlePeopleWorld.Master
             MasterTable<ReactionConditionMaster> reactionConditions,
             MasterTable<InteractionObjectTypeMaster> interactionObjectTypes,
             MasterTable<InteractionFieldMaster> interactionFields,
-            MasterTable<WalkableSurfaceMaster> walkableSurfaces,
             MasterTable<RainbowMaster> rainbows,
             MasterTable<AmbientObjectTypeMaster> ambientObjectTypes,
             MasterTable<VisualEffectMaster> visualEffects,
@@ -562,7 +462,6 @@ namespace LittlePeopleWorld.Master
             ReactionConditions = reactionConditions;
             InteractionObjectTypes = interactionObjectTypes;
             InteractionFields = interactionFields;
-            WalkableSurfaces = walkableSurfaces;
             Rainbows = rainbows;
             AmbientObjectTypes = ambientObjectTypes;
             VisualEffects = visualEffects;
@@ -612,21 +511,15 @@ namespace LittlePeopleWorld.Master
             var reactionConditions = new[]
             {
                 new ReactionConditionMaster(1, 2, InteractionObjectKind.Hand, 0.24f),
-                new ReactionConditionMaster(2, 3, InteractionObjectKind.RoundProp, 0.28f),
-                new ReactionConditionMaster(3, 4, InteractionObjectKind.BarProp, 0.23f)
+                new ReactionConditionMaster(2, 3, InteractionObjectKind.RoundProp, 0.28f)
             };
 
             var fields = new[]
             {
                 new InteractionFieldMaster(1, InteractionFieldKind.Repeller, "hand shadow", 0.25f, 1.25f, 0.02f),
                 new InteractionFieldMaster(2, InteractionFieldKind.OrbitAttractor, "round curiosity", 0.29f, 1.0f, 0.015f),
-                new InteractionFieldMaster(3, InteractionFieldKind.GuideEdge, "bar edge", 0.15f, 1.05f, 0.01f),
+                new InteractionFieldMaster(3, InteractionFieldKind.Shadow, "development mask stroke", 0.15f, 0f, 0.01f),
                 new InteractionFieldMaster(4, InteractionFieldKind.Attractor, "block curiosity", 0.20f, 0.75f, 0.015f)
-            };
-
-            var walkableSurfaces = new[]
-            {
-                new WalkableSurfaceMaster(1, "bar edge lane", 0.14f, 0.22f, 0.13f, 0.72f, 0.022f, 4.32f, 0.22f, 0.03f, 0f, 0.2f, 0.08f, 0.16f, 0.25f, 0.16f, 0.022f, 15f, 0.01f, 0.01f, 0.015f, 0.25f, 0.075f, 0.19f)
             };
 
             var rainbows = new[]
@@ -638,7 +531,7 @@ namespace LittlePeopleWorld.Master
             {
                 new InteractionObjectTypeMaster(1, InteractionObjectKind.Hand, "hand", new Vector2(0.18f, 0.14f), 0.08f, 1, new Color(0.35f, 0.42f, 1f, 0.6f)),
                 new InteractionObjectTypeMaster(2, InteractionObjectKind.RoundProp, "round prop", new Vector2(0.12f, 0.12f), 0.05f, 2, new Color(1f, 0.43f, 0.88f, 0.65f)),
-                new InteractionObjectTypeMaster(3, InteractionObjectKind.BarProp, "bar prop", new Vector2(0.12f, 0.026f), 0.04f, 3, new Color(0.3f, 0.95f, 1f, 0.65f)),
+                new InteractionObjectTypeMaster(3, InteractionObjectKind.MaskStroke, "development mask stroke", new Vector2(0.12f, 0.026f), 0.04f, 3, new Color(0.3f, 0.95f, 1f, 0.65f)),
                 new InteractionObjectTypeMaster(4, InteractionObjectKind.BlockProp, "block prop", new Vector2(0.1f, 0.1f), 0.07f, 4, new Color(1f, 0.78f, 0.25f, 0.65f))
             };
 
@@ -665,7 +558,7 @@ namespace LittlePeopleWorld.Master
 //2.0fは雨の継続時間
             var tuning = new[]
             {
-                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.14f, 0.18f, 0.22f, 0.006f, 0.72f, 0.14f, 0.08f, 1.1f, true, 3, 1, 2.0f, 1.4f, 1.1f)
+                new TuningParameterMaster(1, "default", 0.05f, 0.03f, 0.02f, 0.035f, 0.72f, 0.14f, 0.08f, 3, 1, 2.0f, 1.4f, 1.1f)
             };
 
             return new MasterDatabase(
@@ -676,7 +569,6 @@ namespace LittlePeopleWorld.Master
                 new MasterTable<ReactionConditionMaster>(reactionConditions, x => x.Id),
                 new MasterTable<InteractionObjectTypeMaster>(objectTypes, x => x.Id),
                 new MasterTable<InteractionFieldMaster>(fields, x => x.Id),
-                new MasterTable<WalkableSurfaceMaster>(walkableSurfaces, x => x.Id),
                 new MasterTable<RainbowMaster>(rainbows, x => x.Id),
                 new MasterTable<AmbientObjectTypeMaster>(ambientObjectTypes, x => x.Id),
                 new MasterTable<VisualEffectMaster>(visualEffects, x => x.Id),

@@ -193,12 +193,7 @@ namespace LittlePeopleWorld.Input
 
             try
             {
-                var frame = JsonUtility.FromJson<SensorFrameDto>(message);
-                if (frame == null)
-                {
-                    throw new FormatException("UDP JSON root was empty.");
-                }
-
+                var frame = InteractionProtocolParser.ParseFrame(message);
                 ApplyFrame(frame);
                 lastError = string.Empty;
             }
@@ -221,7 +216,7 @@ namespace LittlePeopleWorld.Input
 
             foreach (var source in objects)
             {
-                if (source == null || IsRemoved(source.state))
+                if (source == null || InteractionProtocolParser.IsRemoved(source.state))
                 {
                     continue;
                 }
@@ -233,12 +228,12 @@ namespace LittlePeopleWorld.Input
                 }
 
                 seenIds.Add(id);
-                var kind = ParseKind(string.IsNullOrWhiteSpace(source.kind) ? source.type : source.kind);
-                var state = ParseState(source.state);
+                var kind = InteractionProtocolParser.ParseKind(string.IsNullOrWhiteSpace(source.kind) ? source.type : source.kind);
+                var state = InteractionProtocolParser.ParseState(source.state);
                 var position = new Vector2(Mathf.Clamp01(source.x), Mathf.Clamp01(source.y));
-                var size = ParseSize(kind, source.w, source.h);
-                var shapeKind = ParseShape(source.shape, source.points);
-                var contourPoints = ParsePoints(source.points);
+                var size = InteractionProtocolParser.ParseSize(kind, source.w, source.h);
+                var shapeKind = InteractionProtocolParser.ParseShape(source.shape, source.points);
+                var contourPoints = InteractionProtocolParser.ParsePoints(source.points);
                 var previousPosition = position;
                 var previousTime = receiveTime;
                 var hasPrevious = trackedObjects.TryGetValue(id, out var previous);
@@ -307,75 +302,6 @@ namespace LittlePeopleWorld.Input
             trackedObjects.Clear();
         }
 
-        static InteractionObjectKind ParseKind(string rawKind)
-        {
-            var value = (rawKind ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_");
-            return value switch
-            {
-                "hand" => InteractionObjectKind.Hand,
-                "round" => InteractionObjectKind.RoundProp,
-                "circle" => InteractionObjectKind.RoundProp,
-                "round_prop" => InteractionObjectKind.RoundProp,
-                "bar" => InteractionObjectKind.BarProp,
-                "stick" => InteractionObjectKind.BarProp,
-                "bar_prop" => InteractionObjectKind.BarProp,
-                "block" => InteractionObjectKind.BlockProp,
-                "block_prop" => InteractionObjectKind.BlockProp,
-                _ => InteractionObjectKind.BarProp
-            };
-        }
-
-        static InteractionObjectState ParseState(string rawState)
-        {
-            var value = (rawState ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_");
-            return value switch
-            {
-                "placing" => InteractionObjectState.Placing,
-                "dragging" => InteractionObjectState.Dragging,
-                _ => InteractionObjectState.Placed
-            };
-        }
-
-        static bool IsRemoved(string rawState)
-        {
-            var value = (rawState ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_");
-            return value == "removed";
-        }
-
-        static Vector2 ParseSize(InteractionObjectKind kind, float width, float height)
-        {
-            var fallback = kind == InteractionObjectKind.BarProp
-                ? new Vector2(0.12f, 0.026f)
-                : new Vector2(0.12f, 0.12f);
-            var safeWidth = width > 0.0001f ? width : fallback.x;
-            var safeHeight = height > 0.0001f ? height : fallback.y;
-            return new Vector2(safeWidth, safeHeight);
-        }
-
-        static InteractionShapeKind ParseShape(string rawShape, PointDto[] points)
-        {
-            var value = (rawShape ?? string.Empty).Trim().ToLowerInvariant().Replace("-", "_");
-            return value == "contour" && points != null && points.Length >= 3
-                ? InteractionShapeKind.Contour
-                : InteractionShapeKind.Primitive;
-        }
-
-        static IReadOnlyList<Vector2> ParsePoints(PointDto[] source)
-        {
-            var points = new List<Vector2>();
-            if (source == null)
-            {
-                return points;
-            }
-
-            foreach (var point in source)
-            {
-                points.Add(new Vector2(Mathf.Clamp01(point.x), Mathf.Clamp01(point.y)));
-            }
-
-            return points;
-        }
-
         readonly struct TrackedObject
         {
             public readonly Vector2 Position;
@@ -388,36 +314,5 @@ namespace LittlePeopleWorld.Input
             }
         }
 
-        [Serializable]
-        sealed class SensorFrameDto
-        {
-            public long frame;
-            public float timestamp;
-            public InteractionObjectDto[] objects;
-        }
-
-        [Serializable]
-        sealed class InteractionObjectDto
-        {
-            public int id;
-            public string kind;
-            public string type;
-            public string shape;
-            public float x;
-            public float y;
-            public float w;
-            public float h;
-            public float angle;
-            public float height;
-            public string state;
-            public PointDto[] points;
-        }
-
-        [Serializable]
-        sealed class PointDto
-        {
-            public float x;
-            public float y;
-        }
     }
 }

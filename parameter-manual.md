@@ -225,7 +225,7 @@ Important values:
 - Duration: `0.45`
 - Drop size scale: `0.4`
 
-`RainLingerSeconds` is currently `5.0`. Touching a cloud keeps rain active for about five seconds after the last touch refresh.
+`RainLingerSeconds` is currently `2.0`. Touching a cloud keeps rain active for about two seconds after the last touch refresh.
 
 ### Star
 
@@ -241,16 +241,12 @@ Important current values:
 |---|---:|
 | `MIN_CONTOUR_AREA_PIXELS` | `500` |
 | `MORPH_KERNEL_SIZE` | `5` |
-| `CLASSIFIER_MODE` | `auto` |
 | `MAPPER_MODE` | `front` |
 | `HAND_MIN_CONTOUR_AREA_PIXELS` | `800` |
 | `HAND_MAX_CONTOUR_AREA_PIXELS` | `80000` |
 | `HAND_APPROX_EPSILON_RATIO` | `0.005` |
 | `HAND_MAX_POINTS` | `80` |
 | `HAND_MIN_POINTS` | `8` |
-| `BAR_MIN_ASPECT_RATIO` | `3.0` |
-| `BAR_MIN_LENGTH_NORMALIZED` | `0.08` |
-| `BAR_MAX_THICKNESS_NORMALIZED` | `0.12` |
 
 ## Exhibition Mode Notes
 

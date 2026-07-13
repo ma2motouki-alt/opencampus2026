@@ -42,7 +42,6 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] int maskWidth = 256;
         [SerializeField] int maskHeight = 144;
         [SerializeField] bool includeHandContours = true;
-        [SerializeField] bool includeBarContours = true;
         [SerializeField] bool showMask;
         [SerializeField] bool transparentMaskBackground;
         [SerializeField] Color32 maskOnColor = new(255, 255, 255, 255);
@@ -665,12 +664,7 @@ namespace LittlePeopleWorld.Unity
                 return false;
             }
 
-            return interactionObject.Kind switch
-            {
-                InteractionObjectKind.Hand => includeHandContours,
-                InteractionObjectKind.BarProp => includeBarContours,
-                _ => false
-            };
+            return interactionObject.Kind == InteractionObjectKind.Hand && includeHandContours;
         }
 
         void FillPolygon(IReadOnlyList<Vector2> normalizedPoints)

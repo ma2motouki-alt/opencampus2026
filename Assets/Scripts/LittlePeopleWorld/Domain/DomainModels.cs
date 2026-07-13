@@ -9,7 +9,7 @@ namespace LittlePeopleWorld.Domain
     {
         Hand = 1,
         RoundProp = 2,
-        BarProp = 3,
+        MaskStroke = 3,
         BlockProp = 4
     }
 
@@ -31,7 +31,6 @@ namespace LittlePeopleWorld.Domain
         Attractor,
         Repeller,
         OrbitAttractor,
-        GuideEdge,
         Shadow
     }
 
@@ -79,10 +78,8 @@ namespace LittlePeopleWorld.Domain
         Orbit,
         FollowEdge,
         EdgeWalk,
-        ClimbBar,
         TransferToSurface,
         SurfaceWalk,
-        RideSurface,
         Falling
     }
 
@@ -94,8 +91,7 @@ namespace LittlePeopleWorld.Domain
 
     public enum WalkableSurfaceKind
     {
-        Bar = 1,
-        Rainbow = 2
+        Rainbow = 1
     }
 
     public enum LittlePersonEmotion
@@ -170,7 +166,7 @@ namespace LittlePeopleWorld.Domain
             var nextY = Mathf.Clamp(Size.y + delta, 0.025f, 0.45f);
             var nextX = Mathf.Clamp(nextY * aspect, 0.025f, 0.75f);
 
-            if (Kind == InteractionObjectKind.BarProp)
+            if (Kind == InteractionObjectKind.MaskStroke)
             {
                 nextX = Mathf.Clamp(Size.x + delta * 1.0f, 0.045f, 0.30f);
                 nextY = Mathf.Clamp(Size.y + delta * 0.14f, 0.014f, 0.055f);
@@ -280,61 +276,7 @@ namespace LittlePeopleWorld.Domain
                 return DistanceToContour(point);
             }
 
-            if (Kind == InteractionFieldKind.GuideEdge)
-            {
-                return DistanceToBar(point);
-            }
-
             return Vector2.Distance(point, Position);
-        }
-
-        public Vector2 DirectionFromSource(Vector2 point)
-        {
-            var direction = point - ClosestPoint(point);
-            return direction.sqrMagnitude > 0.000001f ? direction.normalized : Vector2.up;
-        }
-
-        public Vector2 ClosestPoint(Vector2 point)
-        {
-            if (UsesContourShape)
-            {
-                return ClosestPointOnContour(point);
-            }
-
-            if (Kind != InteractionFieldKind.GuideEdge)
-            {
-                return Position;
-            }
-
-            var radians = AngleDegrees * Mathf.Deg2Rad;
-            var axis = new Vector2(Mathf.Cos(radians), Mathf.Sin(radians));
-            var halfLength = Size.x * 0.5f;
-            var offset = point - Position;
-            var t = Mathf.Clamp(Vector2.Dot(offset, axis), -halfLength, halfLength);
-            return Position + axis * t;
-        }
-
-        public Vector2 Tangent()
-        {
-            var radians = AngleDegrees * Mathf.Deg2Rad;
-            return new Vector2(Mathf.Cos(radians), Mathf.Sin(radians)).normalized;
-        }
-
-        public Vector2 SegmentStart()
-        {
-            return Position - Tangent() * (Size.x * 0.5f);
-        }
-
-        public Vector2 SegmentEnd()
-        {
-            return Position + Tangent() * (Size.x * 0.5f);
-        }
-
-        float DistanceToBar(Vector2 point)
-        {
-            var closest = ClosestPoint(point);
-            var distanceToSegment = Vector2.Distance(point, closest);
-            return Mathf.Max(0f, distanceToSegment - Size.y * 0.5f);
         }
 
         bool UsesContourShape =>
@@ -437,42 +379,27 @@ namespace LittlePeopleWorld.Domain
 
         public int Id { get; }
         public int SourceObjectId { get; }
-        public InteractionObjectKind? SourceKind { get; }
-        public InteractionObjectState SourceState { get; }
-        public Vector2 SourceVelocity { get; }
         public WalkableSurfaceShape Shape { get; }
         public WalkableSurfaceKind Kind { get; }
         public Vector2 Start { get; }
         public Vector2 End { get; }
         public float Width { get; }
-        public int SideIndex { get; }
-        public Vector2 WalkableNormal { get; }
-        public Vector2 PhysicalTipPoint { get; }
         public IReadOnlyList<Vector2> PathPoints => pathPoints;
         public bool AllowsNewAttachment { get; }
         public float AttachProgress { get; }
         public float ExitProgress { get; }
         public Vector2 AttachPoint => PositionAt(AttachProgress);
         public Vector2 PathEndPoint => PositionAt(ExitProgress);
-        public Vector2 ExitPoint { get; }
         public float Length => Mathf.Max(0.001f, totalLength);
-        public bool IsDragging => SourceState == InteractionObjectState.Dragging;
 
         public WalkableSurface(
             int id,
             int sourceObjectId,
-            InteractionObjectKind? sourceKind,
-            InteractionObjectState sourceState,
-            Vector2 sourceVelocity,
             WalkableSurfaceShape shape,
             WalkableSurfaceKind kind,
             Vector2 start,
             Vector2 end,
             float width,
-            int sideIndex,
-            Vector2 walkableNormal,
-            Vector2 physicalTipPoint,
-            Vector2 exitPoint,
             float attachProgress,
             float exitProgress,
             bool allowsNewAttachment = true,
@@ -480,9 +407,6 @@ namespace LittlePeopleWorld.Domain
         {
             Id = id;
             SourceObjectId = sourceObjectId;
-            SourceKind = sourceKind;
-            SourceState = sourceState;
-            SourceVelocity = sourceVelocity;
             Shape = shape;
             Kind = kind;
             if (points != null && points.Count >= 2)
@@ -497,10 +421,6 @@ namespace LittlePeopleWorld.Domain
             Start = pathPoints[0];
             End = pathPoints[pathPoints.Count - 1];
             Width = Mathf.Max(0.001f, width);
-            SideIndex = sideIndex;
-            WalkableNormal = walkableNormal.sqrMagnitude > 0.000001f ? walkableNormal.normalized : Vector2.up;
-            PhysicalTipPoint = physicalTipPoint;
-            ExitPoint = exitPoint;
             AttachProgress = Mathf.Clamp(attachProgress, 0f, 0.98f);
             ExitProgress = Mathf.Clamp(exitProgress, AttachProgress + 0.001f, 1f);
             AllowsNewAttachment = allowsNewAttachment;
@@ -552,37 +472,6 @@ namespace LittlePeopleWorld.Domain
             return fallback.sqrMagnitude > 0.000001f ? fallback.normalized : Vector2.right;
         }
 
-        public float ClosestProgress(Vector2 point, out Vector2 closestPoint, out float distance)
-        {
-            closestPoint = Start;
-            var bestSqrDistance = float.MaxValue;
-            var bestPathDistance = 0f;
-
-            for (var i = 1; i < pathPoints.Count; i++)
-            {
-                var segmentStart = pathPoints[i - 1];
-                var segment = pathPoints[i] - segmentStart;
-                var segmentLengthSqr = segment.sqrMagnitude;
-                var segmentProgress = segmentLengthSqr > 0.000001f
-                    ? Mathf.Clamp01(Vector2.Dot(point - segmentStart, segment) / segmentLengthSqr)
-                    : 0f;
-                var candidate = segmentStart + segment * segmentProgress;
-                var sqrDistance = Vector2.SqrMagnitude(point - candidate);
-                if (sqrDistance >= bestSqrDistance)
-                {
-                    continue;
-                }
-
-                bestSqrDistance = sqrDistance;
-                closestPoint = candidate;
-                var segmentLength = Mathf.Sqrt(segmentLengthSqr);
-                bestPathDistance = cumulativeLengths[i - 1] + segmentLength * segmentProgress;
-            }
-
-            distance = Mathf.Sqrt(bestSqrDistance);
-            return totalLength > 0.000001f ? Mathf.Clamp01(bestPathDistance / totalLength) : 0f;
-        }
-
         void RebuildPathLengths()
         {
             cumulativeLengths.Clear();
@@ -595,266 +484,6 @@ namespace LittlePeopleWorld.Domain
             }
         }
 
-        public bool CanAttachFrom(Vector2 point, float sideTolerance)
-        {
-            return Vector2.Dot(point - AttachPoint, WalkableNormal) >= -Mathf.Max(0f, sideTolerance);
-        }
-
-        public static void AddFromInteractionObject(
-            InteractionObject interactionObject,
-            WalkableSurfaceMaster master,
-            List<WalkableSurface> destination,
-            float displayAspect = 16f / 9f)
-        {
-            if (interactionObject == null ||
-                master == null ||
-                destination == null ||
-                interactionObject.Kind != InteractionObjectKind.BarProp)
-            {
-                return;
-            }
-
-            var radians = interactionObject.AngleDegrees * Mathf.Deg2Rad;
-            var safeAspect = Mathf.Max(0.001f, displayAspect);
-            var visualSize = interactionObject.Size * master.BarVisualScale;
-            var axisOffset = new Vector2(
-                Mathf.Cos(radians) * visualSize.x * 0.5f,
-                Mathf.Sin(radians) * visualSize.x * safeAspect * 0.5f);
-            var sideOffset = new Vector2(
-                Mathf.Sin(radians) * visualSize.y * 0.5f / safeAspect,
-                -Mathf.Cos(radians) * visualSize.y * 0.5f);
-            var center = new Vector2(0.5f, 0.5f);
-            var firstEnd = interactionObject.Position - axisOffset;
-            var secondEnd = interactionObject.Position + axisOffset;
-            var firstEndIsFarther = Vector2.Distance(firstEnd, center) >= Vector2.Distance(secondEnd, center);
-            var farCenter = firstEndIsFarther ? firstEnd : secondEnd;
-            var nearCenter = firstEndIsFarther ? secondEnd : firstEnd;
-            var attachProgress = Mathf.Clamp(master.AttachProgressInset, 0f, 0.95f);
-            var exitProgress = Mathf.Clamp(1f - master.ExitProgressInset, attachProgress + 0.001f, 1f);
-
-            if (ShouldGenerateBothSides(interactionObject.AngleDegrees, master))
-            {
-                AddBarSide(interactionObject, destination, farCenter, nearCenter, sideOffset, master, 1, attachProgress, exitProgress);
-                AddBarSide(interactionObject, destination, farCenter, nearCenter, -sideOffset, master, -1, attachProgress, exitProgress);
-                return;
-            }
-
-            var screenUp = new Vector2(0f, -1f);
-            var walkableSideOffset = Vector2.Dot(sideOffset, screenUp) >= Vector2.Dot(-sideOffset, screenUp)
-                ? sideOffset
-                : -sideOffset;
-            var sideIndex = walkableSideOffset == sideOffset ? 1 : -1;
-            AddBarSide(interactionObject, destination, farCenter, nearCenter, walkableSideOffset, master, sideIndex, attachProgress, exitProgress);
-        }
-
-        static void AddBarSide(
-            InteractionObject interactionObject,
-            List<WalkableSurface> destination,
-            Vector2 farCenter,
-            Vector2 nearCenter,
-            Vector2 sideOffset,
-            WalkableSurfaceMaster master,
-            int sideIndex,
-            float attachProgress,
-            float exitProgress)
-        {
-            var surfaceStart = farCenter + sideOffset;
-            var surfaceEnd = nearCenter + sideOffset;
-            var exitPoint = Vector2.Lerp(surfaceStart, surfaceEnd, exitProgress);
-            var walkableNormal = sideOffset.sqrMagnitude > 0.000001f ? sideOffset.normalized : Vector2.up;
-            var id = interactionObject.Id * 10 + (sideIndex > 0 ? 1 : 2);
-            destination.Add(new WalkableSurface(
-                id,
-                interactionObject.Id,
-                interactionObject.Kind,
-                interactionObject.State,
-                interactionObject.Velocity,
-                WalkableSurfaceShape.Line,
-                WalkableSurfaceKind.Bar,
-                surfaceStart,
-                surfaceEnd,
-                master.SurfaceWidth,
-                sideIndex,
-                walkableNormal,
-                surfaceEnd,
-                exitPoint,
-                attachProgress,
-                exitProgress));
-        }
-
-        static bool ShouldGenerateBothSides(float angleDegrees, WalkableSurfaceMaster master)
-        {
-            var normalizedAngle = Mathf.Repeat(angleDegrees, 180f);
-            return Mathf.Abs(normalizedAngle - 90f) <= master.TwoSidedVerticalToleranceDegrees;
-        }
-
-        static Vector2 Clamp01(Vector2 value)
-        {
-            return new Vector2(Mathf.Clamp01(value.x), Mathf.Clamp01(value.y));
-        }
-    }
-
-    public sealed class PropObstacle
-    {
-        public int Id { get; }
-        public int SourceObjectId { get; }
-        public InteractionObjectKind SourceKind { get; }
-        public InteractionObjectState SourceState { get; }
-        public Vector2 SourceVelocity { get; }
-        public Vector2 Start { get; }
-        public Vector2 End { get; }
-        public float Radius { get; }
-
-        public PropObstacle(
-            int id,
-            int sourceObjectId,
-            InteractionObjectKind sourceKind,
-            InteractionObjectState sourceState,
-            Vector2 sourceVelocity,
-            Vector2 start,
-            Vector2 end,
-            float radius)
-        {
-            Id = id;
-            SourceObjectId = sourceObjectId;
-            SourceKind = sourceKind;
-            SourceState = sourceState;
-            SourceVelocity = sourceVelocity;
-            Start = start;
-            End = end;
-            Radius = Mathf.Max(0.001f, radius);
-        }
-
-        public bool Contains(Vector2 point, float extraRadius)
-        {
-            var local = ToLocal(point, out var length);
-            var halfWidth = Radius + Mathf.Max(0f, extraRadius);
-            return IsInsideRectangle(local, 0f, length, -halfWidth, halfWidth);
-        }
-
-        public bool IntersectsMovement(Vector2 from, Vector2 to, float extraRadius)
-        {
-            var fromLocal = ToLocal(from, out var length);
-            var toLocal = ToLocal(to, out _);
-            var halfWidth = Radius + Mathf.Max(0f, extraRadius);
-            return SegmentIntersectsRectangle(fromLocal, toLocal, 0f, length, -halfWidth, halfWidth);
-        }
-
-        public float DistanceTo(Vector2 point)
-        {
-            var local = ToLocal(point, out var length);
-            var dx = Mathf.Max(Mathf.Max(-local.x, local.x - length), 0f);
-            var dy = Mathf.Max(Mathf.Abs(local.y) - Radius, 0f);
-            return Mathf.Sqrt(dx * dx + dy * dy);
-        }
-
-        public static void AddFromInteractionObject(
-            InteractionObject interactionObject,
-            WalkableSurfaceMaster master,
-            List<PropObstacle> destination,
-            float displayAspect = 16f / 9f)
-        {
-            if (interactionObject == null ||
-                master == null ||
-                destination == null ||
-                interactionObject.Kind != InteractionObjectKind.BarProp)
-            {
-                return;
-            }
-
-            var radians = interactionObject.AngleDegrees * Mathf.Deg2Rad;
-            var safeAspect = Mathf.Max(0.001f, displayAspect);
-            var visualSize = interactionObject.Size * master.BarVisualScale;
-            var axisOffset = new Vector2(
-                Mathf.Cos(radians) * visualSize.x * 0.5f,
-                Mathf.Sin(radians) * visualSize.x * safeAspect * 0.5f);
-            var start = interactionObject.Position - axisOffset;
-            var end = interactionObject.Position + axisOffset;
-            var radius = visualSize.y * 0.5f + master.BarObstaclePadding;
-
-            destination.Add(new PropObstacle(
-                interactionObject.Id,
-                interactionObject.Id,
-                interactionObject.Kind,
-                interactionObject.State,
-                interactionObject.Velocity,
-                start,
-                end,
-                radius));
-        }
-
-        Vector2 ToLocal(Vector2 point, out float length)
-        {
-            var axis = End - Start;
-            length = axis.magnitude;
-            if (length <= 0.000001f)
-            {
-                return point - Start;
-            }
-
-            axis /= length;
-            var normal = new Vector2(-axis.y, axis.x);
-            var relative = point - Start;
-            return new Vector2(Vector2.Dot(relative, axis), Vector2.Dot(relative, normal));
-        }
-
-        static bool SegmentIntersectsRectangle(Vector2 a, Vector2 b, float minX, float maxX, float minY, float maxY)
-        {
-            if (IsInsideRectangle(a, minX, maxX, minY, maxY) ||
-                IsInsideRectangle(b, minX, maxX, minY, maxY))
-            {
-                return true;
-            }
-
-            var bottomLeft = new Vector2(minX, minY);
-            var bottomRight = new Vector2(maxX, minY);
-            var topRight = new Vector2(maxX, maxY);
-            var topLeft = new Vector2(minX, maxY);
-            return SegmentsIntersect(a, b, bottomLeft, bottomRight) ||
-                   SegmentsIntersect(a, b, bottomRight, topRight) ||
-                   SegmentsIntersect(a, b, topRight, topLeft) ||
-                   SegmentsIntersect(a, b, topLeft, bottomLeft);
-        }
-
-        static bool IsInsideRectangle(Vector2 point, float minX, float maxX, float minY, float maxY)
-        {
-            return point.x >= minX - 0.000001f &&
-                   point.x <= maxX + 0.000001f &&
-                   point.y >= minY - 0.000001f &&
-                   point.y <= maxY + 0.000001f;
-        }
-
-        static bool SegmentsIntersect(Vector2 a0, Vector2 a1, Vector2 b0, Vector2 b1)
-        {
-            var d1 = Direction(a0, a1, b0);
-            var d2 = Direction(a0, a1, b1);
-            var d3 = Direction(b0, b1, a0);
-            var d4 = Direction(b0, b1, a1);
-
-            if (((d1 > 0f && d2 < 0f) || (d1 < 0f && d2 > 0f)) &&
-                ((d3 > 0f && d4 < 0f) || (d3 < 0f && d4 > 0f)))
-            {
-                return true;
-            }
-
-            return Mathf.Abs(d1) <= 0.000001f && OnSegment(a0, a1, b0) ||
-                   Mathf.Abs(d2) <= 0.000001f && OnSegment(a0, a1, b1) ||
-                   Mathf.Abs(d3) <= 0.000001f && OnSegment(b0, b1, a0) ||
-                   Mathf.Abs(d4) <= 0.000001f && OnSegment(b0, b1, a1);
-        }
-
-        static float Direction(Vector2 a, Vector2 b, Vector2 c)
-        {
-            return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
-        }
-
-        static bool OnSegment(Vector2 a, Vector2 b, Vector2 c)
-        {
-            return c.x >= Mathf.Min(a.x, b.x) - 0.000001f &&
-                   c.x <= Mathf.Max(a.x, b.x) + 0.000001f &&
-                   c.y >= Mathf.Min(a.y, b.y) - 0.000001f &&
-                   c.y <= Mathf.Max(a.y, b.y) + 0.000001f;
-        }
     }
 
     public sealed class ReactionInstance
@@ -1201,34 +830,26 @@ namespace LittlePeopleWorld.Domain
                 return;
             }
 
-            AddSurface(destination, master, pathPoints, SurfaceIdBase + Id * 10 + 1, 1);
-            AddSurface(destination, master, reversedPathPoints, SurfaceIdBase + Id * 10 + 2, -1);
+            AddSurface(destination, master, pathPoints, SurfaceIdBase + Id * 10 + 1);
+            AddSurface(destination, master, reversedPathPoints, SurfaceIdBase + Id * 10 + 2);
         }
 
         void AddSurface(
             List<WalkableSurface> destination,
             RainbowMaster master,
             IReadOnlyList<Vector2> points,
-            int surfaceId,
-            int sideIndex)
+            int surfaceId)
         {
             var start = points[0];
             var end = points[points.Count - 1];
             destination.Add(new WalkableSurface(
                 surfaceId,
                 SourceIdBase + Id,
-                null,
-                InteractionObjectState.Placed,
-                Vector2.zero,
                 WalkableSurfaceShape.Polyline,
                 WalkableSurfaceKind.Rainbow,
                 start,
                 end,
                 master.SurfaceWidth,
-                sideIndex,
-                new Vector2(0f, -1f),
-                end,
-                end,
                 0f,
                 1f,
                 AllowsNewAttachment,
@@ -1243,13 +864,6 @@ namespace LittlePeopleWorld.Domain
         float wanderTimer;
         float edgeProgress;
         int edgeDirection;
-        int barSourceObjectId = -1;
-        Vector2 barStart;
-        Vector2 barTop;
-        float barProgress;
-        float barTopDwellTimer;
-        float barSideSign = 1f;
-        float barSideOffsetDistance;
         int surfaceId = -1;
         int surfaceSourceObjectId = -1;
         WalkableSurfaceKind? activeSurfaceKind;
@@ -1267,13 +881,8 @@ namespace LittlePeopleWorld.Domain
         float fallTimer;
         int fallSourceObjectId = -1;
         int fallExitEdgeDirection = 1;
-        int climbCooldownSourceObjectId = -1;
-        float climbCooldownTimer;
-        int edgeBlockCooldownSourceObjectId = -1;
-        float edgeBlockCooldownTimer;
-        int surfaceConnectionCooldownSourceObjectId = -1;
-        int surfaceConnectionCooldownSurfaceId = -1;
-        float surfaceConnectionCooldownTimer;
+        int reconnectCooldownSourceObjectId = -1;
+        float reconnectCooldownTimer;
 
         public Guid Id { get; }
         public int ArchetypeId { get; }
@@ -1286,7 +895,6 @@ namespace LittlePeopleWorld.Domain
         public int TargetObjectId { get; private set; }
         public ReactionInstance CurrentReaction { get; private set; }
         public float EdgeProgress => edgeProgress;
-        public int BarSourceObjectId => barSourceObjectId;
         public int SurfaceId => surfaceId;
         public WalkableSurfaceKind? ActiveSurfaceKind => activeSurfaceKind;
 
@@ -1317,7 +925,6 @@ namespace LittlePeopleWorld.Domain
             float deltaTime,
             IReadOnlyList<InteractionField> fields,
             IReadOnlyList<WalkableSurface> surfaces,
-            IReadOnlyList<PropObstacle> obstacles,
             IReadOnlyList<LittlePerson> neighbors,
             MasterDatabase masters,
             TuningParameterMaster tuning)
@@ -1331,7 +938,7 @@ namespace LittlePeopleWorld.Domain
                 CurrentReaction = null;
             }
 
-            AdvanceSurfaceConnectionCooldown(deltaTime);
+            AdvanceReconnectCooldown(deltaTime);
 
             if (TryDropFromTouchedRainbow(fields, surfaces, masters, tuning))
             {
@@ -1345,17 +952,13 @@ namespace LittlePeopleWorld.Domain
                     AdvanceTransferToSurface(deltaTime, surfaces, masters, tuning);
                     break;
                 case LittlePersonBehaviorKind.SurfaceWalk:
-                case LittlePersonBehaviorKind.RideSurface:
                     AdvanceSurfaceMotion(deltaTime, surfaces, masters, tuning);
-                    break;
-                case LittlePersonBehaviorKind.ClimbBar:
-                    AdvanceClimbBar(deltaTime, fields, masters, tuning);
                     break;
                 case LittlePersonBehaviorKind.Falling:
                     AdvanceFalling(deltaTime, tuning);
                     break;
                 default:
-                    AdvanceEdgeWalk(deltaTime, fields, surfaces, obstacles, archetype, profile, masters, tuning);
+                    AdvanceEdgeWalk(deltaTime, fields, surfaces, archetype, profile, masters, tuning);
                     break;
             }
         }
@@ -1368,9 +971,7 @@ namespace LittlePeopleWorld.Domain
                 CurrentReaction = null;
             }
 
-            AdvanceSurfaceConnectionCooldown(deltaTime);
-            AdvanceClimbCooldown(deltaTime);
-            AdvanceEdgeBlockCooldown(deltaTime);
+            AdvanceReconnectCooldown(deltaTime);
             Velocity = Vector2.zero;
         }
 
@@ -1378,19 +979,16 @@ namespace LittlePeopleWorld.Domain
             float deltaTime,
             IReadOnlyList<InteractionField> fields,
             IReadOnlyList<WalkableSurface> surfaces,
-            IReadOnlyList<PropObstacle> obstacles,
             LittlePersonArchetypeMaster archetype,
             BehaviorProfileMaster profile,
             MasterDatabase masters,
             TuningParameterMaster tuning)
         {
-            AdvanceClimbCooldown(deltaTime);
-            AdvanceEdgeBlockCooldown(deltaTime);
+            AdvanceReconnectCooldown(deltaTime);
 
             CurrentBehavior = LittlePersonBehaviorKind.EdgeWalk;
             Emotion = LittlePersonEmotion.Calm;
             TargetObjectId = -1;
-            barSourceObjectId = -1;
             surfaceId = -1;
             surfaceSourceObjectId = -1;
             activeSurfaceKind = null;
@@ -1410,11 +1008,6 @@ namespace LittlePeopleWorld.Domain
             var pathLength = EdgePathLength(tuning.WorldEdgePadding);
             var nextProgress = Mathf.Repeat(edgeProgress + edgeDirection * archetype.MoveSpeed * deltaTime / pathLength, 1f);
             var nextPosition = PositionOnEdge(nextProgress, tuning.WorldEdgePadding);
-            if (TryHandlePropObstacleBlock(previous, nextPosition, deltaTime, obstacles, surfaces, archetype, masters, tuning))
-            {
-                return;
-            }
-
             edgeProgress = nextProgress;
             Position = nextPosition;
             Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
@@ -1427,8 +1020,7 @@ namespace LittlePeopleWorld.Domain
             TuningParameterMaster tuning)
         {
             if (CurrentBehavior != LittlePersonBehaviorKind.TransferToSurface &&
-                CurrentBehavior != LittlePersonBehaviorKind.SurfaceWalk &&
-                CurrentBehavior != LittlePersonBehaviorKind.RideSurface)
+                CurrentBehavior != LittlePersonBehaviorKind.SurfaceWalk)
             {
                 return false;
             }
@@ -1462,23 +1054,12 @@ namespace LittlePeopleWorld.Domain
 
         bool TryStartSurfaceTransfer(IReadOnlyList<WalkableSurface> surfaces, MasterDatabase masters, TuningParameterMaster tuning)
         {
-            return TryStartSurfaceTransfer(surfaces, masters, tuning, Position, Position, -1);
-        }
-
-        bool TryStartSurfaceTransfer(
-            IReadOnlyList<WalkableSurface> surfaces,
-            MasterDatabase masters,
-            TuningParameterMaster tuning,
-            Vector2 probePosition,
-            Vector2 transferOrigin,
-            int sourceObjectIdFilter)
-        {
             if (surfaces == null)
             {
                 return false;
             }
 
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
+            var rainbowMaster = masters.Rainbows.Get(1);
             WalkableSurface selected = null;
             Vector2 selectedPoint = Vector2.zero;
             float selectedProgress = 0f;
@@ -1486,47 +1067,20 @@ namespace LittlePeopleWorld.Domain
 
             foreach (var surface in surfaces)
             {
-                if (sourceObjectIdFilter >= 0 && surface.SourceObjectId != sourceObjectIdFilter)
+                if (surface.Kind != WalkableSurfaceKind.Rainbow || !surface.AllowsNewAttachment)
                 {
                     continue;
                 }
 
-                if (!surface.AllowsNewAttachment)
-                {
-                    continue;
-                }
-
-                if (surface.Kind == WalkableSurfaceKind.Bar &&
-                    surface.SourceKind != InteractionObjectKind.BarProp)
-                {
-                    continue;
-                }
-
-                if (surface.Kind == WalkableSurfaceKind.Bar &&
-                    tuning.BarDragBlocksClimb &&
-                    surface.SourceState != InteractionObjectState.Placed)
-                {
-                    continue;
-                }
-
-                if (climbCooldownTimer > 0f && surface.SourceObjectId == climbCooldownSourceObjectId)
-                {
-                    continue;
-                }
-
-                if (surface.Kind == WalkableSurfaceKind.Bar &&
-                    !surface.CanAttachFrom(probePosition, surfaceMaster.AttachSideTolerance))
+                if (reconnectCooldownTimer > 0f && surface.SourceObjectId == reconnectCooldownSourceObjectId)
                 {
                     continue;
                 }
 
                 var closestPoint = surface.AttachPoint;
                 var progress = surface.AttachProgress;
-                var distance = Vector2.Distance(probePosition, closestPoint);
-                var attachDistance = surface.Kind == WalkableSurfaceKind.Rainbow
-                    ? masters.Rainbows.Get(1).AttachDistance
-                    : surfaceMaster.AttachDistance;
-                if (distance <= attachDistance && distance < selectedDistance)
+                var distance = Vector2.Distance(Position, closestPoint);
+                if (distance <= rainbowMaster.AttachDistance && distance < selectedDistance)
                 {
                     selected = surface;
                     selectedPoint = closestPoint;
@@ -1543,16 +1097,13 @@ namespace LittlePeopleWorld.Domain
             surfaceId = selected.Id;
             surfaceSourceObjectId = selected.SourceObjectId;
             activeSurfaceKind = selected.Kind;
-            barSourceObjectId = selected.SourceObjectId;
             surfaceProgress = selectedProgress;
             surfaceExitReached = false;
             surfaceExitDwellTimer = 0f;
-            transferStart = transferOrigin;
+            transferStart = Position;
             transferEnd = selectedPoint;
             transferTimer = 0f;
-            transferDurationSeconds = selected.Kind == WalkableSurfaceKind.Rainbow
-                ? masters.Rainbows.Get(1).TransferDurationSeconds
-                : surfaceMaster.TransferDurationSeconds;
+            transferDurationSeconds = rainbowMaster.TransferDurationSeconds;
             transferTargetProgress = selectedProgress;
             TargetObjectId = selected.SourceObjectId;
             CurrentBehavior = LittlePersonBehaviorKind.TransferToSurface;
@@ -1562,90 +1113,12 @@ namespace LittlePeopleWorld.Domain
             return true;
         }
 
-        bool TryHandlePropObstacleBlock(
-            Vector2 previous,
-            Vector2 next,
-            float deltaTime,
-            IReadOnlyList<PropObstacle> obstacles,
-            IReadOnlyList<WalkableSurface> surfaces,
-            LittlePersonArchetypeMaster archetype,
-            MasterDatabase masters,
-            TuningParameterMaster tuning)
-        {
-            if (obstacles == null)
-            {
-                return false;
-            }
-
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
-            foreach (var obstacle in obstacles)
-            {
-                if (obstacle.SourceKind != InteractionObjectKind.BarProp)
-                {
-                    continue;
-                }
-
-                var collisionRadius = archetype.Size;
-                var wasInside = obstacle.Contains(previous, collisionRadius);
-                var isInside = obstacle.Contains(next, collisionRadius);
-                var intersects = obstacle.IntersectsMovement(previous, next, collisionRadius);
-                if (!isInside && !intersects)
-                {
-                    continue;
-                }
-
-                if (wasInside && !isInside)
-                {
-                    continue;
-                }
-
-                if (edgeBlockCooldownTimer > 0f && obstacle.SourceObjectId == edgeBlockCooldownSourceObjectId)
-                {
-                    continue;
-                }
-
-                if (TryStartSurfaceTransfer(surfaces, masters, tuning, next, previous, obstacle.SourceObjectId))
-                {
-                    AdvanceTransferToSurface(deltaTime, surfaces, masters, tuning);
-                    return true;
-                }
-
-                ReverseAtPropObstacle(previous, deltaTime, obstacle, surfaceMaster, masters, tuning);
-                return true;
-            }
-
-            return false;
-        }
-
-        void ReverseAtPropObstacle(
-            Vector2 previous,
-            float deltaTime,
-            PropObstacle obstacle,
-            WalkableSurfaceMaster surfaceMaster,
-            MasterDatabase masters,
-            TuningParameterMaster tuning)
-        {
-            edgeDirection *= -1;
-            edgeBlockCooldownSourceObjectId = obstacle.SourceObjectId;
-            edgeBlockCooldownTimer = surfaceMaster.EdgeBlockCooldownSeconds;
-
-            var pathLength = EdgePathLength(tuning.WorldEdgePadding);
-            edgeProgress = ClosestProgressOnEdge(previous, tuning.WorldEdgePadding, out _);
-            edgeProgress = Mathf.Repeat(edgeProgress + edgeDirection * surfaceMaster.EdgeBlockBackoffDistance / pathLength, 1f);
-            Position = PositionOnEdge(edgeProgress, tuning.WorldEdgePadding);
-            Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
-            TargetObjectId = obstacle.SourceObjectId;
-            Emotion = LittlePersonEmotion.Startled;
-            EnsureReaction(masters.Reactions.Get(2));
-        }
-
         void AdvanceTransferToSurface(
             float deltaTime,
             IReadOnlyList<WalkableSurface> surfaces,
             MasterDatabase masters,
             TuningParameterMaster tuning)
         {
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
             var surface = FindSurfaceById(surfaces, surfaceId);
             if (surface == null)
             {
@@ -1659,14 +1132,13 @@ namespace LittlePeopleWorld.Domain
             CurrentBehavior = LittlePersonBehaviorKind.TransferToSurface;
             Emotion = LittlePersonEmotion.Curious;
             TargetObjectId = surface.SourceObjectId;
-            barSourceObjectId = surface.SourceObjectId;
             surfaceSourceObjectId = surface.SourceObjectId;
             activeSurfaceKind = surface.Kind;
             EnsureReaction(masters.Reactions.Get(4));
 
             var previous = Position;
             transferTimer += Mathf.Max(0f, deltaTime);
-            var duration = transferDurationSeconds > 0f ? transferDurationSeconds : surfaceMaster.TransferDurationSeconds;
+            var duration = Mathf.Max(0.001f, transferDurationSeconds);
             var t = Mathf.Clamp01(transferTimer / duration);
             Position = Vector2.Lerp(transferStart, transferEnd, Mathf.SmoothStep(0f, 1f, t));
             Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
@@ -1684,7 +1156,6 @@ namespace LittlePeopleWorld.Domain
             MasterDatabase masters,
             TuningParameterMaster tuning)
         {
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
             var surface = FindSurfaceById(surfaces, surfaceId);
             if (surface == null)
             {
@@ -1693,16 +1164,7 @@ namespace LittlePeopleWorld.Domain
                 return;
             }
 
-            if (surface.Kind == WalkableSurfaceKind.Bar &&
-                surface.SourceVelocity.magnitude > surfaceMaster.RideVelocityLimit)
-            {
-                StartFalling(tuning, Position);
-                AdvanceFalling(deltaTime, tuning);
-                return;
-            }
-
             TargetObjectId = surface.SourceObjectId;
-            barSourceObjectId = surface.SourceObjectId;
             surfaceSourceObjectId = surface.SourceObjectId;
             activeSurfaceKind = surface.Kind;
             Emotion = LittlePersonEmotion.Curious;
@@ -1715,41 +1177,18 @@ namespace LittlePeopleWorld.Domain
                 Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
                 surfaceExitDwellTimer += Mathf.Max(0f, deltaTime);
 
-                var exitDwellSeconds = surface.Kind == WalkableSurfaceKind.Rainbow
-                    ? masters.Rainbows.Get(1).ExitDwellSeconds
-                    : surfaceMaster.SurfaceExitDwellSeconds;
+                var exitDwellSeconds = masters.Rainbows.Get(1).ExitDwellSeconds;
                 if (surfaceExitDwellTimer >= exitDwellSeconds)
                 {
-                    if (surface.Kind == WalkableSurfaceKind.Rainbow)
-                    {
-                        CompleteRainbowWalk(surface, tuning, masters);
-                        return;
-                    }
-
-                    if (TryStartSurfaceToSurfaceTransfer(surface, surfaces, masters))
-                    {
-                        return;
-                    }
-
-                    StartFalling(tuning, surface.PathEndPoint);
+                    CompleteRainbowWalk(surface, tuning, masters);
                 }
 
                 return;
             }
 
-            if (surface.Kind == WalkableSurfaceKind.Bar && surface.IsDragging)
-            {
-                CurrentBehavior = LittlePersonBehaviorKind.RideSurface;
-            }
-            else
-            {
-                CurrentBehavior = LittlePersonBehaviorKind.SurfaceWalk;
-                var walkSpeed = surface.Kind == WalkableSurfaceKind.Rainbow
-                    ? masters.Rainbows.Get(1).WalkSpeed
-                    : surfaceMaster.SurfaceWalkSpeed;
-                var walkDistance = walkSpeed * Mathf.Max(0f, deltaTime);
-                surfaceProgress = Mathf.Min(surface.ExitProgress, surfaceProgress + walkDistance / surface.Length);
-            }
+            CurrentBehavior = LittlePersonBehaviorKind.SurfaceWalk;
+            var walkDistance = masters.Rainbows.Get(1).WalkSpeed * Mathf.Max(0f, deltaTime);
+            surfaceProgress = Mathf.Min(surface.ExitProgress, surfaceProgress + walkDistance / surface.Length);
 
             if (surfaceProgress >= surface.ExitProgress)
             {
@@ -1763,9 +1202,7 @@ namespace LittlePeopleWorld.Domain
             }
 
             var next = surface.PositionAt(surfaceProgress);
-            var detachDistance = surface.Kind == WalkableSurfaceKind.Rainbow
-                ? masters.Rainbows.Get(1).DetachDistance
-                : surfaceMaster.DetachDistance;
+            var detachDistance = masters.Rainbows.Get(1).DetachDistance;
             if (Vector2.Distance(previous, next) > detachDistance)
             {
                 StartFalling(tuning, previous);
@@ -1784,14 +1221,13 @@ namespace LittlePeopleWorld.Domain
             CurrentBehavior = LittlePersonBehaviorKind.EdgeWalk;
             Emotion = LittlePersonEmotion.Calm;
             TargetObjectId = -1;
-            barSourceObjectId = -1;
             surfaceId = -1;
             surfaceSourceObjectId = -1;
             activeSurfaceKind = null;
             surfaceExitReached = false;
             surfaceExitDwellTimer = 0f;
-            climbCooldownSourceObjectId = surface.SourceObjectId;
-            climbCooldownTimer = masters.Rainbows.Get(1).ReconnectCooldownSeconds;
+            reconnectCooldownSourceObjectId = surface.SourceObjectId;
+            reconnectCooldownTimer = masters.Rainbows.Get(1).ReconnectCooldownSeconds;
 
             var tangent = surface.Tangent();
             if (Mathf.Abs(tangent.x) > 0.0001f)
@@ -1800,212 +1236,6 @@ namespace LittlePeopleWorld.Domain
             }
         }
 
-
-        bool TryStartSurfaceToSurfaceTransfer(
-            WalkableSurface currentSurface,
-            IReadOnlyList<WalkableSurface> surfaces,
-            MasterDatabase masters)
-        {
-            if (currentSurface == null || surfaces == null)
-            {
-                return false;
-            }
-
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
-            var connectionStart = currentSurface.PathEndPoint;
-            var currentDirection = currentSurface.Tangent();
-            WalkableSurface selected = null;
-            Vector2 selectedPoint = Vector2.zero;
-            float selectedProgress = 0f;
-            var selectedDistance = float.MaxValue;
-            var selectedAlignment = -2f;
-
-            foreach (var surface in surfaces)
-            {
-                if (surface.Id == currentSurface.Id ||
-                    surface.SourceObjectId == currentSurface.SourceObjectId ||
-                    surface.SourceKind != InteractionObjectKind.BarProp ||
-                    surface.SourceState != InteractionObjectState.Placed)
-                {
-                    continue;
-                }
-
-                if (surfaceConnectionCooldownTimer > 0f &&
-                    (surface.SourceObjectId == surfaceConnectionCooldownSourceObjectId ||
-                     surface.Id == surfaceConnectionCooldownSurfaceId))
-                {
-                    continue;
-                }
-
-                var progress = surface.ClosestProgress(connectionStart, out var closestPoint, out var distance);
-                progress = Mathf.Clamp(progress, surface.AttachProgress, surface.ExitProgress);
-                var targetPoint = surface.PositionAt(progress);
-                distance = Vector2.Distance(connectionStart, targetPoint);
-                if (distance > surfaceMaster.SurfaceConnectionDistance)
-                {
-                    continue;
-                }
-
-                if (Vector2.Dot(connectionStart - targetPoint, surface.WalkableNormal) < -surfaceMaster.AttachSideTolerance)
-                {
-                    continue;
-                }
-
-                var toTarget = targetPoint - connectionStart;
-                var alignment = toTarget.sqrMagnitude > 0.000001f
-                    ? Vector2.Dot(currentDirection, toTarget.normalized)
-                    : 1f;
-
-                if (distance < selectedDistance - 0.0001f ||
-                    Mathf.Abs(distance - selectedDistance) <= 0.0001f && alignment > selectedAlignment)
-                {
-                    selected = surface;
-                    selectedPoint = targetPoint;
-                    selectedProgress = progress;
-                    selectedDistance = distance;
-                    selectedAlignment = alignment;
-                }
-            }
-
-            if (selected == null)
-            {
-                return false;
-            }
-
-            surfaceConnectionCooldownSourceObjectId = currentSurface.SourceObjectId;
-            surfaceConnectionCooldownSurfaceId = currentSurface.Id;
-            surfaceConnectionCooldownTimer = surfaceMaster.SurfaceConnectionCooldownSeconds;
-
-            surfaceId = selected.Id;
-            surfaceSourceObjectId = selected.SourceObjectId;
-            barSourceObjectId = selected.SourceObjectId;
-            surfaceProgress = selectedProgress;
-            surfaceExitReached = false;
-            surfaceExitDwellTimer = 0f;
-            transferStart = connectionStart;
-            transferEnd = selectedPoint;
-            transferTimer = 0f;
-            transferDurationSeconds = surfaceMaster.SurfaceConnectionTransferDurationSeconds;
-            transferTargetProgress = selectedProgress;
-            TargetObjectId = selected.SourceObjectId;
-            CurrentBehavior = LittlePersonBehaviorKind.TransferToSurface;
-            Emotion = LittlePersonEmotion.Curious;
-            EnsureReaction(masters.Reactions.Get(4));
-            Velocity = Vector2.zero;
-            return true;
-        }
-
-        bool TryStartBarClimb(IReadOnlyList<InteractionField> fields, MasterDatabase masters, TuningParameterMaster tuning)
-        {
-            InteractionField selected = null;
-            var selectedDistance = float.MaxValue;
-
-            foreach (var field in fields)
-            {
-                if (field.SourceKind != InteractionObjectKind.BarProp || field.Kind != InteractionFieldKind.GuideEdge)
-                {
-                    continue;
-                }
-
-                if (tuning.BarDragBlocksClimb && field.SourceState == InteractionObjectState.Dragging)
-                {
-                    continue;
-                }
-
-                if (climbCooldownTimer > 0f && field.SourceObjectId == climbCooldownSourceObjectId)
-                {
-                    continue;
-                }
-
-                var distance = field.DistanceTo(Position);
-                if (distance <= tuning.EdgeAttachDistance && distance < selectedDistance)
-                {
-                    selected = field;
-                    selectedDistance = distance;
-                }
-            }
-
-            if (selected == null)
-            {
-                return false;
-            }
-
-            var start = selected.ClosestPoint(Position);
-            var a = selected.SegmentStart();
-            var b = selected.SegmentEnd();
-            var center = new Vector2(0.5f, 0.5f);
-            var top = Vector2.Distance(a, center) <= Vector2.Distance(b, center) ? a : b;
-            var archetype = masters.LittlePersonArchetypes.Get(ArchetypeId);
-            barSideSign = ChooseBarSideSign(selected, start);
-            barSideOffsetDistance = selected.Size.y * 0.5f + archetype.Size + tuning.BarSideWalkPadding;
-            var sideOffset = BarSideOffset(selected);
-
-            barSourceObjectId = selected.SourceObjectId;
-            barStart = Clamp01(start + sideOffset);
-            barTop = Clamp01(top + sideOffset);
-            barProgress = 0f;
-            barTopDwellTimer = 0f;
-            TargetObjectId = selected.SourceObjectId;
-            CurrentBehavior = LittlePersonBehaviorKind.ClimbBar;
-            Emotion = LittlePersonEmotion.Curious;
-            EnsureReaction(masters.Reactions.Get(4));
-            Position = barStart;
-            Velocity = Vector2.zero;
-            return true;
-        }
-
-        void AdvanceClimbBar(
-            float deltaTime,
-            IReadOnlyList<InteractionField> fields,
-            MasterDatabase masters,
-            TuningParameterMaster tuning)
-        {
-            var field = FindFieldBySourceId(fields, barSourceObjectId);
-            if (field == null)
-            {
-                StartFalling(tuning, Position);
-                AdvanceFalling(deltaTime, tuning);
-                return;
-            }
-
-            var a = field.SegmentStart();
-            var b = field.SegmentEnd();
-            var center = new Vector2(0.5f, 0.5f);
-            var top = Vector2.Distance(a, center) <= Vector2.Distance(b, center) ? a : b;
-            barTop = Clamp01(top + BarSideOffset(field));
-
-            CurrentBehavior = LittlePersonBehaviorKind.ClimbBar;
-            Emotion = LittlePersonEmotion.Curious;
-            TargetObjectId = barSourceObjectId;
-            EnsureReaction(masters.Reactions.Get(4));
-
-            var previous = Position;
-            if (barProgress >= 1f)
-            {
-                Position = barTop;
-                Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
-                barTopDwellTimer += Mathf.Max(0f, deltaTime);
-
-                if (barTopDwellTimer >= tuning.BarTopDwellSeconds)
-                {
-                    StartFalling(tuning, barTop);
-                }
-
-                return;
-            }
-
-            var climbDistance = Mathf.Max(0.001f, Vector2.Distance(barStart, barTop));
-            barProgress = Mathf.Clamp01(barProgress + tuning.ClimbSpeed * deltaTime / climbDistance);
-            Position = Vector2.Lerp(barStart, barTop, Mathf.SmoothStep(0f, 1f, barProgress));
-            Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
-
-            if (barProgress >= 1f)
-            {
-                Position = barTop;
-                Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
-                barTopDwellTimer = 0f;
-            }
-        }
 
         void AdvanceFalling(float deltaTime, TuningParameterMaster tuning)
         {
@@ -2026,13 +1256,12 @@ namespace LittlePeopleWorld.Domain
                 CurrentBehavior = LittlePersonBehaviorKind.EdgeWalk;
                 Emotion = LittlePersonEmotion.Calm;
                 TargetObjectId = -1;
-                barSourceObjectId = -1;
                 surfaceId = -1;
                 surfaceSourceObjectId = -1;
                 activeSurfaceKind = null;
                 edgeDirection = fallExitEdgeDirection;
-                climbCooldownSourceObjectId = fallSourceObjectId;
-                climbCooldownTimer = tuning.SurfaceReconnectCooldownSeconds;
+                reconnectCooldownSourceObjectId = fallSourceObjectId;
+                reconnectCooldownTimer = tuning.SurfaceReconnectCooldownSeconds;
                 fallSourceObjectId = -1;
             }
         }
@@ -2041,7 +1270,7 @@ namespace LittlePeopleWorld.Domain
         {
             fallStart = startPosition;
             Position = fallStart;
-            fallSourceObjectId = surfaceSourceObjectId >= 0 ? surfaceSourceObjectId : barSourceObjectId;
+            fallSourceObjectId = surfaceSourceObjectId;
             var nearestProgress = ClosestProgressOnEdge(fallStart, tuning.WorldEdgePadding, out _);
             fallExitEdgeDirection = ChooseFallExitDirection(nearestProgress, tuning);
             var shiftedProgress = nearestProgress + fallExitEdgeDirection * tuning.FallLateralDistance / EdgePathLength(tuning.WorldEdgePadding);
@@ -2051,7 +1280,6 @@ namespace LittlePeopleWorld.Domain
             CurrentBehavior = LittlePersonBehaviorKind.Falling;
             Emotion = LittlePersonEmotion.Startled;
             TargetObjectId = -1;
-            barSourceObjectId = -1;
             surfaceId = -1;
             surfaceSourceObjectId = -1;
             activeSurfaceKind = null;
@@ -2059,75 +1287,18 @@ namespace LittlePeopleWorld.Domain
             surfaceExitDwellTimer = 0f;
         }
 
-        void AdvanceClimbCooldown(float deltaTime)
+        void AdvanceReconnectCooldown(float deltaTime)
         {
-            if (climbCooldownTimer <= 0f)
+            if (reconnectCooldownTimer <= 0f)
             {
                 return;
             }
 
-            climbCooldownTimer = Mathf.Max(0f, climbCooldownTimer - Mathf.Max(0f, deltaTime));
-            if (climbCooldownTimer <= 0f)
+            reconnectCooldownTimer = Mathf.Max(0f, reconnectCooldownTimer - Mathf.Max(0f, deltaTime));
+            if (reconnectCooldownTimer <= 0f)
             {
-                climbCooldownSourceObjectId = -1;
+                reconnectCooldownSourceObjectId = -1;
             }
-        }
-
-        void AdvanceEdgeBlockCooldown(float deltaTime)
-        {
-            if (edgeBlockCooldownTimer <= 0f)
-            {
-                return;
-            }
-
-            edgeBlockCooldownTimer = Mathf.Max(0f, edgeBlockCooldownTimer - Mathf.Max(0f, deltaTime));
-            if (edgeBlockCooldownTimer <= 0f)
-            {
-                edgeBlockCooldownSourceObjectId = -1;
-            }
-        }
-
-        void AdvanceSurfaceConnectionCooldown(float deltaTime)
-        {
-            if (surfaceConnectionCooldownTimer <= 0f)
-            {
-                return;
-            }
-
-            surfaceConnectionCooldownTimer = Mathf.Max(0f, surfaceConnectionCooldownTimer - Mathf.Max(0f, deltaTime));
-            if (surfaceConnectionCooldownTimer <= 0f)
-            {
-                surfaceConnectionCooldownSourceObjectId = -1;
-                surfaceConnectionCooldownSurfaceId = -1;
-            }
-        }
-
-        float ChooseBarSideSign(InteractionField field, Vector2 centerLinePoint)
-        {
-            var normal = BarNormal(field);
-            var side = Vector2.Dot(Position - centerLinePoint, normal);
-            if (Mathf.Abs(side) < 0.001f)
-            {
-                side = Vector2.Dot(centerLinePoint - new Vector2(0.5f, 0.5f), normal);
-            }
-
-            if (Mathf.Abs(side) < 0.001f)
-            {
-                side = (PreferenceSeed & 1) == 0 ? 1f : -1f;
-            }
-
-            return side >= 0f ? 1f : -1f;
-        }
-
-        Vector2 BarSideOffset(InteractionField field)
-        {
-            return BarNormal(field) * barSideSign * barSideOffsetDistance;
-        }
-
-        static Vector2 BarNormal(InteractionField field)
-        {
-            var tangent = field.Tangent();
-            return new Vector2(-tangent.y, tangent.x).normalized;
         }
 
         int ChooseFallExitDirection(float nearestProgress, TuningParameterMaster tuning)
@@ -2211,19 +1382,6 @@ namespace LittlePeopleWorld.Domain
             {
                 edgeDirection *= -1;
             }
-        }
-
-        static InteractionField FindFieldBySourceId(IReadOnlyList<InteractionField> fields, int sourceObjectId)
-        {
-            foreach (var field in fields)
-            {
-                if (field.SourceObjectId == sourceObjectId)
-                {
-                    return field;
-                }
-            }
-
-            return null;
         }
 
         static WalkableSurface FindSurfaceById(IReadOnlyList<WalkableSurface> surfaces, int id)
@@ -2355,7 +1513,6 @@ namespace LittlePeopleWorld.Domain
         readonly List<InteractionObject> interactionObjects = new();
         readonly List<InteractionField> interactionFields = new();
         readonly List<WalkableSurface> walkableSurfaces = new();
-        readonly List<PropObstacle> propObstacles = new();
         readonly List<AmbientObject> ambientObjects = new();
         readonly List<VisualEffectInstance> visualEffects = new();
         readonly List<RainbowInstance> rainbows = new();
@@ -2367,22 +1524,15 @@ namespace LittlePeopleWorld.Domain
         int activeBloomCount;
         bool rainbowConditionLatched;
         float rainbowCooldownSeconds;
-        float displayAspect = 16f / 9f;
 
         public IReadOnlyList<LittlePerson> LittlePeople => littlePeople;
         public IReadOnlyList<InteractionObject> InteractionObjects => interactionObjects;
         public IReadOnlyList<InteractionField> InteractionFields => interactionFields;
         public IReadOnlyList<WalkableSurface> WalkableSurfaces => walkableSurfaces;
-        public IReadOnlyList<PropObstacle> PropObstacles => propObstacles;
         public IReadOnlyList<AmbientObject> AmbientObjects => ambientObjects;
         public IReadOnlyList<VisualEffectInstance> VisualEffects => visualEffects;
         public IReadOnlyList<RainbowInstance> Rainbows => rainbows;
         public int RainbowSpawnSequence => rainbowSpawnSequence;
-
-        public void SetDisplayAspect(float aspect)
-        {
-            displayAspect = Mathf.Max(0.001f, aspect);
-        }
 
         public void SetMovementPausedLittlePeople(IReadOnlyCollection<Guid> personIds)
         {
@@ -2434,7 +1584,6 @@ namespace LittlePeopleWorld.Domain
             interactionObjects.Clear();
             interactionFields.Clear();
             walkableSurfaces.Clear();
-            propObstacles.Clear();
 
             if (objects != null)
             {
@@ -2555,7 +1704,7 @@ namespace LittlePeopleWorld.Domain
                     continue;
                 }
 
-                person.Advance(deltaTime, interactionFields, walkableSurfaces, propObstacles, littlePeople, masters, tuning);
+                person.Advance(deltaTime, interactionFields, walkableSurfaces, littlePeople, masters, tuning);
             }
 
             foreach (var ambientObject in ambientObjects)

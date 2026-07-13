@@ -45,7 +45,7 @@ def find_interaction_contours(mask, return_debug: bool = False):
 
 
 def find_hand_contours(mask):
-    # Backward-compatible alias. The returned contours may become hand or bar_prop later.
+    # Backward-compatible alias for callers that only need accepted hand contours.
     return find_interaction_contours(mask)
 
 

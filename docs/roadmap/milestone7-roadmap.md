@@ -25,7 +25,7 @@ Unity側の入力差し替え口を完成させ、Mouse と UDP RealSense を同
 - Mouse input still works.
 - UDP test sender can create objects in Unity.
 - Contour hands are parsed and displayed.
-- `bar_prop` inputs still generate surfaces.
+- Legacy `bar_prop` input is safely treated as hand input.
 - Invalid or missing UDP packets do not stop Unity.
 
 ## Handoff Notes

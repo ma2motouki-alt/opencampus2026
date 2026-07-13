@@ -46,7 +46,6 @@ namespace LittlePeopleWorld.Unity
         readonly List<LittlePersonView> littlePersonViews = new();
         readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
         readonly Dictionary<int, WalkableSurfaceView> walkableSurfaceViews = new();
-        readonly Dictionary<int, PropObstacleView> propObstacleViews = new();
         readonly Dictionary<int, AmbientObjectView> ambientObjectViews = new();
         readonly Dictionary<int, VisualEffectView> visualEffectViews = new();
         readonly Dictionary<int, RainbowView> rainbowViews = new();
@@ -60,7 +59,6 @@ namespace LittlePeopleWorld.Unity
         Transform littlePeopleRoot;
         Transform objectsRoot;
         Transform surfacesRoot;
-        Transform obstaclesRoot;
         Transform ambientRoot;
         Transform effectsRoot;
         Transform rainbowRoot;
@@ -88,7 +86,6 @@ namespace LittlePeopleWorld.Unity
                 BuildWorld();
             }
 
-            world.SetDisplayAspect(mapper.WorldWidth / mapper.WorldHeight);
             world.SetActiveBloomCount(
                 enableRecognitionMaskAnimation && maskAnimationController != null
                     ? maskAnimationController.ActiveBloomCount : 0);
@@ -103,7 +100,6 @@ namespace LittlePeopleWorld.Unity
             SyncInteractionObjectViews();
             SyncWalkableSurfaceViews();
             SyncRainbowViews();
-            SyncPropObstacleViews();
             SyncAmbientObjectViews();
             SyncRecognitionMaskAnimation();
             SyncVisualEffectViews();
@@ -161,11 +157,11 @@ namespace LittlePeopleWorld.Unity
             var text =
                 "Little People World MVP\n" +
                 $"Input: {InputProviderLabel()}\n" +
-                "1 Hand  2 Round  3 Bar\n" +
+                "1 Hand  2 Round  3 Mask Stroke\n" +
                 "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
                 "Right click: development rain  Shift+Right click: leaf hang/drop debug\n" +
                 $"{developmentRainbowKey}: development rainbow\n" +
-                $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}\n" +
+                $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}\n" +
                 $"Rainbows: {world?.Rainbows.Count ?? 0}  Rainbow walkers: {RainbowWalkerCount()}";
 
             var rainOcclusionDebugText = maskAnimationController != null
@@ -252,7 +248,7 @@ namespace LittlePeopleWorld.Unity
 
         void EnsureAudioListener()
         {
-            if (targetCamera == null || FindFirstObjectByType<AudioListener>() != null)
+            if (targetCamera == null || FindAnyObjectByType<AudioListener>() != null)
             {
                 return;
             }
@@ -335,7 +331,6 @@ namespace LittlePeopleWorld.Unity
             littlePeopleRoot = CreateRoot("Little People");
             objectsRoot = CreateRoot("Interaction Objects");
             surfacesRoot = CreateRoot("Walkable Surfaces");
-            obstaclesRoot = CreateRoot("Prop Obstacles");
             ambientRoot = CreateRoot("Ambient Objects");
             effectsRoot = CreateRoot("Visual Effects");
             rainbowRoot = CreateRoot("Rainbows");
@@ -524,28 +519,6 @@ namespace LittlePeopleWorld.Unity
             }
 
             RemoveDeadWalkableSurfaceViews(liveIds);
-        }
-
-        void SyncPropObstacleViews()
-        {
-            var liveIds = new HashSet<int>();
-
-            foreach (var obstacle in world.PropObstacles)
-            {
-                liveIds.Add(obstacle.Id);
-                if (!propObstacleViews.TryGetValue(obstacle.Id, out var view))
-                {
-                    var viewObject = new GameObject($"Prop Obstacle {obstacle.Id}");
-                    viewObject.transform.SetParent(obstaclesRoot, false);
-                    view = viewObject.AddComponent<PropObstacleView>();
-                    view.Initialize();
-                    propObstacleViews.Add(obstacle.Id, view);
-                }
-
-                view.Render(obstacle, mapper, IsDebugEnabled());
-            }
-
-            RemoveDeadPropObstacleViews(liveIds);
         }
 
         void SyncAmbientObjectViews()
@@ -800,28 +773,6 @@ namespace LittlePeopleWorld.Unity
                 }
 
                 walkableSurfaceViews.Remove(id);
-            }
-        }
-
-        void RemoveDeadPropObstacleViews(HashSet<int> liveIds)
-        {
-            var deadIds = new List<int>();
-            foreach (var pair in propObstacleViews)
-            {
-                if (!liveIds.Contains(pair.Key))
-                {
-                    deadIds.Add(pair.Key);
-                }
-            }
-
-            foreach (var id in deadIds)
-            {
-                if (propObstacleViews[id] != null)
-                {
-                    Destroy(propObstacleViews[id].gameObject);
-                }
-
-                propObstacleViews.Remove(id);
             }
         }
 

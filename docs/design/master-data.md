@@ -17,9 +17,8 @@ Master data is immutable while the app is running. Domain objects hold runtime s
 | `BehaviorProfileMaster` | Edge-walk timing and personality tuning. |
 | `ReactionMaster` | Runtime reaction kinds. |
 | `ReactionConditionMaster` | Reaction conditions. |
-| `InteractionObjectTypeMaster` | Hand, round prop, bar prop, block prop defaults. |
+| `InteractionObjectTypeMaster` | Hand, round prop, development mask stroke, and block prop defaults. |
 | `InteractionFieldMaster` | Repel, curiosity, and legacy field definitions. |
-| `WalkableSurfaceMaster` | Prop edge walking, riding, transfer, obstacle, and reconnect tuning. |
 | `RainbowMaster` | Rainbow trigger, lifetime, geometry, walking, and touch tuning. |
 | `AmbientObjectTypeMaster` | Cloud and star size, drift, touch radius, movement band, and effect link. |
 | `VisualEffectMaster` | Procedural or prefab visual effect definitions. |
@@ -31,33 +30,8 @@ Master data is immutable while the app is running. Domain objects hold runtime s
 ### World
 
 - Preset id: `1`
-- Little people count: `42`
+- Little people count: `20`
 - Background: dark table color
-
-### Walkable Surface
-
-`WalkableSurfaceMaster` default values include:
-
-- `AttachDistance = 0.14`
-- `DetachDistance = 0.22`
-- `SurfaceWalkSpeed = 0.13`
-- `RideVelocityLimit = 0.72`
-- `SurfaceWidth = 0.022`
-- `BarVisualScale = 4.32`
-- `TransferDurationSeconds = 0.22`
-- `AttachProgressInset = 0.03`
-- `ExitProgressInset = 0.0`
-- `SurfaceExitDwellSeconds = 0.2`
-- `SurfaceConnectionDistance = 0.08`
-- `SurfaceConnectionTransferDurationSeconds = 0.16`
-- `SurfaceConnectionCooldownSeconds = 0.25`
-- `TwoSidedVerticalToleranceDegrees = 15`
-- `AttachSideTolerance = 0.01`
-- `BarObstaclePadding = 0.01`
-- `EdgeBlockBackoffDistance = 0.015`
-- `EdgeBlockCooldownSeconds = 0.25`
-
-The current bar walking model uses the visible rectangle edge, not a separate outside platform.
 
 ### Cloud
 

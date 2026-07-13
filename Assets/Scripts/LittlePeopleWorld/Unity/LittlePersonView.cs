@@ -118,8 +118,7 @@ namespace LittlePeopleWorld.Unity
             var isLookingAtPlant = plantLookTimer > 0f && !isHangingFromLeaf && !isDroppingFromLeaf;
             var isWalkingOnRainbow = person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow &&
                                      (person.CurrentBehavior == LittlePersonBehaviorKind.TransferToSurface ||
-                                      person.CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk ||
-                                      person.CurrentBehavior == LittlePersonBehaviorKind.RideSurface);
+                                      person.CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk);
             var isLookingAtHand = !isLookingAtPlant &&
                                   person.CurrentBehavior == LittlePersonBehaviorKind.EdgeWalk &&
                                   person.Emotion == LittlePersonEmotion.Startled;
@@ -347,8 +346,7 @@ namespace LittlePeopleWorld.Unity
 
             return person.Velocity.sqrMagnitude > 0.000001f ||
                    person.CurrentBehavior == LittlePersonBehaviorKind.TransferToSurface ||
-                   person.CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk ||
-                   person.CurrentBehavior == LittlePersonBehaviorKind.RideSurface;
+                   person.CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk;
         }
 
         float RotationDegrees(LittlePerson person)
@@ -618,10 +616,8 @@ namespace LittlePeopleWorld.Unity
         {
             switch (person.CurrentBehavior)
             {
-                case LittlePersonBehaviorKind.ClimbBar:
                 case LittlePersonBehaviorKind.TransferToSurface:
                 case LittlePersonBehaviorKind.SurfaceWalk:
-                case LittlePersonBehaviorKind.RideSurface:
                     return new Color(0.36f, 1f, 0.95f, 1f);
                 case LittlePersonBehaviorKind.Falling:
                     return new Color(0.7f, 0.85f, 1f, 1f);
@@ -642,10 +638,8 @@ namespace LittlePeopleWorld.Unity
         {
             switch (person.CurrentBehavior)
             {
-                case LittlePersonBehaviorKind.ClimbBar:
                 case LittlePersonBehaviorKind.TransferToSurface:
                 case LittlePersonBehaviorKind.SurfaceWalk:
-                case LittlePersonBehaviorKind.RideSurface:
                     return 2.25f;
                 case LittlePersonBehaviorKind.Falling:
                     return 3.2f;
@@ -666,10 +660,8 @@ namespace LittlePeopleWorld.Unity
         {
             switch (person.CurrentBehavior)
             {
-                case LittlePersonBehaviorKind.ClimbBar:
                 case LittlePersonBehaviorKind.TransferToSurface:
                 case LittlePersonBehaviorKind.SurfaceWalk:
-                case LittlePersonBehaviorKind.RideSurface:
                     return 0.38f;
                 case LittlePersonBehaviorKind.Falling:
                     return 0.55f;

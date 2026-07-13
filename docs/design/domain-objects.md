@@ -9,9 +9,8 @@
 | `LittlePersonBehaviorState` | Current movement and emotional state. |
 | `InteractionObject` | Runtime input object from mouse or UDP RealSense. |
 | `InteractionField` | Reaction field generated from an input object. |
-| `WalkableSurface` | Line or polyline walking rule generated from a `BarProp` or rainbow. |
+| `WalkableSurface` | Directed walking path generated from a rainbow. |
 | `RainbowInstance` | Temporary curved world object created by bloom and distant-rain conditions. |
-| `PropObstacle` | Blocking prop body generated from a `BarProp`. |
 | `AmbientObject` | World-owned cloud or star. |
 | `VisualEffectInstance` | Runtime visual effect such as rain or star burst. |
 | `SensorFrame` | UDP input frame model. |
@@ -37,7 +36,6 @@ Contour points are normalized display coordinates. They are clamped to `0.0..1.0
 `InteractionField.DistanceTo(point)` supports:
 
 - primitive circle/box fallback,
-- bar distance,
 - contour polygon distance.
 
 For contour hands, a point inside the contour has distance `0`. A point outside uses the shortest distance to the contour edge. Little people use `HandContourReactionPadding` for contour reaction distance.
@@ -49,30 +47,13 @@ Current movement states include:
 - `EdgeWalk`
 - `TransferToSurface`
 - `SurfaceWalk`
-- `RideSurface`
 - `Falling`
 
-Little people usually live on the inset edge path. When a valid bar surface attach point is near enough and approachable from the walkable side, they transfer onto the surface.
+Little people usually live on the inset edge path. When an active rainbow foot is near enough, they transfer onto the rainbow path.
 
 ## Walkable Surface
 
-Current `BarProp` surfaces are generated from the visible bar rectangle.
-
-- The path lies on the real long edge of the rectangle.
-- The attach side is near the edge-side / far end.
-- The path end is near the center-side tip.
-- A tilted bar exposes only the screen-up side as walkable.
-- A near-vertical bar can expose both sides.
-- If another surface is close to the current tip, the little person transfers directly.
-- If no nearby surface exists, the little person falls back to the display edge.
-
-The debug surface line should overlap the visible bar lane. It is not a separate platform.
-
-## Prop Obstacle
-
-`PropObstacle` prevents edge-walking little people from passing through a non-walkable bar side.
-
-It is an oriented rectangle matching the visible bar body with a small padding. It should not create rounded end caps extending beyond the visible tip.
+Current surfaces are generated only from rainbow path points. Each rainbow creates one directed path in each direction. Little people attach at a foot and return to the display edge at the opposite foot.
 
 ## Ambient Objects
 

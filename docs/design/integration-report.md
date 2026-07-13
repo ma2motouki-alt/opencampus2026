@@ -19,7 +19,7 @@ This repository has moved from the early mouse-only MVP into an integrated `main
 - `Master/`
 - `IInteractionInputProvider`
 - `LittlePeopleWorldOrchestrator`
-- derived `InteractionField`, `WalkableSurface`, and `PropObstacle`
+- derived `InteractionField` and rainbow `WalkableSurface`
 
 The domain remains independent of mouse vs UDP input.
 
@@ -42,7 +42,8 @@ The domain remains independent of mouse vs UDP input.
 - Visible detected regions are drawn from contour points, not from the raw low-resolution mask texture.
 - The low-resolution mask remains useful for particle and plant behavior.
 - Hand contour reaction uses polygon distance.
-- Bar-like objects can be displayed as contours while still producing walkable bar surfaces.
+- RealSense contours are treated uniformly as hand input; slender-object classification has been retired.
+- Walkable surfaces are reserved for rainbow paths.
 - RealSense front/top-view mapping is the default practical setup.
 - Homography remains available but is not required for the current expected camera placement.
 - Exhibition setup currently assumes a 52-inch TV facing upward and no protective acrylic.

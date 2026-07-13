@@ -23,9 +23,6 @@ DEBUG_PRINT_SUMMARY_INTERVAL_SECONDS = 1.0
 
 DEFAULT_OBJECT_KIND = "hand"
 DEFAULT_OBJECT_STATE = "placed"
-# "auto" sends slender contours as bar_prop and other contours as hand.
-# "fixed" sends every contour as DEFAULT_OBJECT_KIND or --kind.
-CLASSIFIER_MODE = "auto"
 
 # "front" maps camera image coordinates directly to normalized display coordinates.
 # "homography" uses calibration.json for oblique camera placement.
@@ -48,11 +45,6 @@ HAND_MIN_POINTS = 8
 HAND_MAX_ASPECT_RATIO = 4.5
 HAND_MIN_NORMALIZED_SIZE = 0.015
 HAND_REACTION_SIZE_SCALE = 1.0
-
-# Slender contour classification for bar-like objects.
-BAR_MIN_ASPECT_RATIO = 3.0
-BAR_MIN_LENGTH_NORMALIZED = 0.08
-BAR_MAX_THICKNESS_NORMALIZED = 0.12
 
 # Small contours can produce very thin boxes. These defaults keep Unity visible.
 MIN_NORMALIZED_WIDTH = 0.015
