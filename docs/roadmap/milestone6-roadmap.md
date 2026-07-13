@@ -6,7 +6,9 @@
 
 ## Target Scope
 
-- `Masters.cs`
+- `Master/MasterDatabase.cs`
+- `Master/*Masters.cs`
+- `Master/TuningParameterMaster.cs`
 - `WorldSpaceMaskAnimationController.cs`
 - Python RealSense `config.py`
 - Unity inspector values

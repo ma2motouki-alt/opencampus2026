@@ -2,7 +2,7 @@
 
 This document describes the parameters used by the current `main` branch.
 
-Most visual tuning happens in `Assets/Scripts/LittlePeopleWorld/Unity/WorldSpaceMaskAnimationController.cs`. Domain-level tuning and effect defaults are in `Assets/Scripts/LittlePeopleWorld/Master/Masters.cs`.
+Most visual tuning happens in `Assets/Scripts/LittlePeopleWorld/Unity/WorldSpaceMaskAnimationController.cs`. Domain-level tuning types are under `Assets/Scripts/LittlePeopleWorld/Master/`, and the current default records are assembled in `MasterDatabase.cs`.
 
 ## Unity Inspector Parameters
 
@@ -169,7 +169,7 @@ Flower burst is triggered when a hand contour touches the flower area. It does n
 
 ### Cloud
 
-Location: `Assets/Scripts/LittlePeopleWorld/Master/Masters.cs`
+Location: `Assets/Scripts/LittlePeopleWorld/Master/MasterDatabase.cs`
 
 Current cloud master:
 

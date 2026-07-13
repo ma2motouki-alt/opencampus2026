@@ -49,6 +49,16 @@ Mouse / UDP RealSense
 - `LittlePerson.cs`: little-person state and movement rules.
 - `World.cs`: aggregate root and frame progression.
 
+`Masters.cs` has also been split without changing master IDs, defaults, or public APIs:
+
+- `MasterTable.cs`: immutable lookup table.
+- `WorldAndLittlePersonMasters.cs`: world and little-person definitions.
+- `InteractionMasters.cs`: input, field, and reaction definitions.
+- `EnvironmentMasters.cs`: rainbow and ambient-object definitions.
+- `PresentationMasters.cs`: visual-effect and sound definitions.
+- `TuningParameterMaster.cs`: shared runtime tuning values.
+- `MasterDatabase.cs`: table ownership and default record assembly.
+
 ## Next Structural Steps
 
 1. Split `WorldSpaceMaskAnimationController` into recognition mask, fairy simulation, plant lifecycle, rain occlusion, and renderers.
