@@ -59,20 +59,47 @@ Mouse / UDP RealSense
 - `TuningParameterMaster.cs`: shared runtime tuning values.
 - `MasterDatabase.cs`: table ownership and default record assembly.
 
-`WorldSpaceMaskAnimationController` is now a partial class split by runtime responsibility. Its
-serialized fields and public facade remain in the original file, so scene references and Inspector
-values are unchanged:
+Phase 4 split `WorldSpaceMaskAnimationController` into independently owned runtime systems under
+`Unity/Animation`. The original MonoBehaviour remains as a compatibility facade: it keeps the
+existing serialized Inspector fields and delegates work to `WorldAnimationController`.
 
-- `.RecognitionMask.cs`: contour rasterization, filtering, fields, and coordinate conversion.
-- `.Fairies.cs`: fairy creation, movement, flower attraction, burst, and cloud contact.
-- `.Plants.cs`: plant lifecycle and little-person plant/leaf spatial queries.
-- `.RainOcclusion.cs`: rain landing and mask occlusion.
-- `.Renderers.cs`: mask, fairy, and plant rendering.
+```text
+Animation/
+  RecognitionMask.cs
+  Fairy/
+    FairySimulation.cs
+    FairyRenderer.cs
+    FairySettings.cs
+  Plants/
+    PlantSystem.cs
+    PlantModel.cs
+    PlantView.cs
+    LeafLayout.cs
+    PlantSettings.cs
+  Rain/
+    RainPlantInteraction.cs
+    RainOcclusionSystem.cs
+  WorldAnimationController.cs
+```
+
+Responsibilities:
+
+- `RecognitionMask`: contour rasterization, blob filtering, mask field sampling, and coordinate conversion.
+- `FairySimulation`: fairy state, movement, flower attraction/burst, and cloud contact.
+- `FairyRenderer`: fairy GameObject creation and wing/body rendering.
+- `PlantSystem`: plant collection, lifecycle progression, spatial queries, and view synchronization.
+- `PlantModel`: lifecycle state for one plant.
+- `LeafLayout`: shared leaf coordinates for rendering and little-person hanging.
+- `PlantView`: stem, leaf, and flower rendering only.
+- `RainPlantInteraction`: rain timing, landing positions, and watering plants.
+- `RainOcclusionSystem`: recognition-mask blocking and visible rain-column length.
+- `WorldAnimationController`: update ordering and communication among the systems.
+- `WorldSpaceMaskAnimationController`: scene/Inspector compatibility facade only.
 
 ## Next Structural Steps
 
 1. Move plant-look and leaf-hang timers out of `LittlePersonView` into a runtime state object.
 2. Split UDP transport and track state while keeping `InteractionProtocolParser` and `IInteractionInputProvider` stable.
-3. Move frequently tuned visual values into dedicated settings assets after the runtime classes are separated.
+3. Convert the runtime `FairySettings` and `PlantSettings` snapshots into dedicated settings assets when tuning ownership is finalized.
 
 Each step must preserve the accepted baseline and pass C# compilation plus `python -m compileall python/realsense`.
