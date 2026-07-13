@@ -47,7 +47,11 @@ The triangulator uses ear clipping. It expects reasonably ordered contour points
 Implemented in:
 
 ```text
-Assets/Scripts/LittlePeopleWorld/Unity/WorldSpaceMaskAnimationController.cs
+Assets/Scripts/LittlePeopleWorld/Unity/
+  WorldSpaceMaskAnimationController.cs
+  WorldSpaceMaskAnimationController.RecognitionMask.cs
+  WorldSpaceMaskAnimationController.Fairies.cs
+  WorldSpaceMaskAnimationController.Renderers.cs
 ```
 
 Responsibilities:

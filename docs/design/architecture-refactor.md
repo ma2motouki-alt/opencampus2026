@@ -59,11 +59,20 @@ Mouse / UDP RealSense
 - `TuningParameterMaster.cs`: shared runtime tuning values.
 - `MasterDatabase.cs`: table ownership and default record assembly.
 
+`WorldSpaceMaskAnimationController` is now a partial class split by runtime responsibility. Its
+serialized fields and public facade remain in the original file, so scene references and Inspector
+values are unchanged:
+
+- `.RecognitionMask.cs`: contour rasterization, filtering, fields, and coordinate conversion.
+- `.Fairies.cs`: fairy creation, movement, flower attraction, burst, and cloud contact.
+- `.Plants.cs`: plant lifecycle and little-person plant/leaf spatial queries.
+- `.RainOcclusion.cs`: rain landing and mask occlusion.
+- `.Renderers.cs`: mask, fairy, and plant rendering.
+
 ## Next Structural Steps
 
-1. Split `WorldSpaceMaskAnimationController` into recognition mask, fairy simulation, plant lifecycle, rain occlusion, and renderers.
-2. Move plant-look and leaf-hang timers out of `LittlePersonView` into a runtime state object.
-3. Split UDP transport and track state while keeping `InteractionProtocolParser` and `IInteractionInputProvider` stable.
-4. Move frequently tuned visual values into dedicated settings assets after the runtime classes are separated.
+1. Move plant-look and leaf-hang timers out of `LittlePersonView` into a runtime state object.
+2. Split UDP transport and track state while keeping `InteractionProtocolParser` and `IInteractionInputProvider` stable.
+3. Move frequently tuned visual values into dedicated settings assets after the runtime classes are separated.
 
 Each step must preserve the accepted baseline and pass C# compilation plus `python -m compileall python/realsense`.
