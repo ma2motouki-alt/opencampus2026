@@ -285,6 +285,7 @@ MonoBehaviour:
   plantStartClip: {fileID: 8300000, guid: f823da8bc1532aa4a8e22e4eacb5f00c, type: 3}
   plantBloomClip: {fileID: 8300000, guid: 7640d5c0e4f43d8479ae473041292c63, type: 3}
   flowerBurstClip: {fileID: 8300000, guid: fda6e12d1defe2e4a874f274628a0aac, type: 3}
+  rainbowClip: {fileID: 8300000, guid: d14b40ac93ff4967b90cfebcbf134e2d, type: 3}
   masterVolume: 1
   baseAmbientVolume: 0.35
   rainLayerVolume: 0.45
@@ -292,6 +293,7 @@ MonoBehaviour:
   plantStartVolume: 0.5
   plantBloomVolume: 0.55
   flowerBurstVolume: 0.65
+  rainbowVolume: 0.65
   layerFadeSeconds: 1.2
   playBaseAmbient: 1
   enableRainLayer: 1
@@ -299,6 +301,7 @@ MonoBehaviour:
   enablePlantStartOneShot: 1
   enablePlantBloomOneShot: 1
   enableFlowerBurstOneShot: 1
+  enableRainbowOneShot: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

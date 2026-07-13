@@ -47,7 +47,15 @@ The triangulator uses ear clipping. It expects reasonably ordered contour points
 Implemented in:
 
 ```text
-Assets/Scripts/LittlePeopleWorld/Unity/WorldSpaceMaskAnimationController.cs
+Assets/Scripts/LittlePeopleWorld/Unity/Animation/
+  RecognitionMask.cs
+  WorldAnimationController.cs
+  Fairy/
+    FairySimulation.cs
+    FairyRenderer.cs
+  Plants/
+    PlantSystem.cs
+    PlantView.cs
 ```
 
 Responsibilities:
@@ -78,14 +86,14 @@ Visible contour fill uses Unity world coordinates.
 
 Particles and plants use mask-pixel coordinates internally. Conversion is done by:
 
-- `NormalizedToMaskPx`
-- `MaskPxToNormalized`
-- `MaskToWorld`
+- `RecognitionMask.NormalizedToPixel`
+- `RecognitionMask.PixelToNormalized`
+- `RecognitionMask.PixelToWorld`
 
 ## Behavior
 
 - Hand contours are filled and influence little people through contour distance.
-- Bar contours are filled when available and can still produce bar walkable surfaces.
+- Legacy bar values are treated as hand/mask input; only rainbow paths create walkable surfaces.
 - Particles are attracted to current contour masks.
 - Rain creates or grows plants.
 - Particles can climb plants and attach near flowers.

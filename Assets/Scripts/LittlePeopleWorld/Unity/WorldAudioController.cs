@@ -13,6 +13,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] AudioClip plantStartClip;
         [SerializeField] AudioClip plantBloomClip;
         [SerializeField] AudioClip flowerBurstClip;
+        [SerializeField] AudioClip rainbowClip;
 
         [Header("Volumes")]
         [SerializeField, Range(0f, 1f)] float masterVolume = 1f;
@@ -22,6 +23,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField, Range(0f, 1f)] float plantStartVolume = 0.5f;
         [SerializeField, Range(0f, 1f)] float plantBloomVolume = 0.55f;
         [SerializeField, Range(0f, 1f)] float flowerBurstVolume = 0.65f;
+        [SerializeField, Range(0f, 1f)] float rainbowVolume = 0.65f;
         [SerializeField] float layerFadeSeconds = 1.2f;
 
         [Header("Layer Switches")]
@@ -31,6 +33,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] bool enablePlantStartOneShot = true;
         [SerializeField] bool enablePlantBloomOneShot = true;
         [SerializeField] bool enableFlowerBurstOneShot = true;
+        [SerializeField] bool enableRainbowOneShot = true;
 
         AudioSource baseAmbientSource;
         AudioSource rainLayerSource;
@@ -39,9 +42,11 @@ namespace LittlePeopleWorld.Unity
         int lastPlantSpawnSequence;
         int lastPlantBloomSequence;
         int lastFlowerBurstSequence;
+        int lastRainbowSpawnSequence;
         bool hasPlantSpawnSequence;
         bool hasPlantBloomSequence;
         bool hasFlowerBurstSequence;
+        bool hasRainbowSpawnSequence;
 
         public void UpdateAudio(
             World world,
@@ -50,7 +55,8 @@ namespace LittlePeopleWorld.Unity
             bool plantGrowthActive,
             int plantSpawnSequence,
             int plantBloomSequence,
-            int flowerBurstSequence)
+            int flowerBurstSequence,
+            int rainbowSpawnSequence)
         {
             EnsureSources();
 
@@ -95,6 +101,13 @@ namespace LittlePeopleWorld.Unity
                 enableFlowerBurstOneShot,
                 flowerBurstClip,
                 volumeMultiplier * flowerBurstVolume);
+            UpdateOneShotSequence(
+                ref lastRainbowSpawnSequence,
+                ref hasRainbowSpawnSequence,
+                rainbowSpawnSequence,
+                enableRainbowOneShot,
+                rainbowClip,
+                volumeMultiplier * rainbowVolume);
         }
 
         public void SetAudioActive(bool active)
@@ -112,6 +125,7 @@ namespace LittlePeopleWorld.Unity
             hasPlantSpawnSequence = false;
             hasPlantBloomSequence = false;
             hasFlowerBurstSequence = false;
+            hasRainbowSpawnSequence = false;
         }
 
         void EnsureSources()

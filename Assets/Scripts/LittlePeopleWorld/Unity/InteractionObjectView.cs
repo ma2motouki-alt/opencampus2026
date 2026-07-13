@@ -40,13 +40,11 @@ namespace LittlePeopleWorld.Unity
             transform.rotation = Quaternion.Euler(0f, 0f, -interactionObject.AngleDegrees);
 
             var objectScale = mapper.ToWorldScale(interactionObject.Size);
-            var isBar = interactionObject.Kind == InteractionObjectKind.BarProp;
-            var objectSprite = isBar ? RuntimeSpriteFactory.Square : RuntimeSpriteFactory.Circle;
+            var isMaskStroke = interactionObject.Kind == InteractionObjectKind.MaskStroke;
+            var objectSprite = isMaskStroke ? RuntimeSpriteFactory.Square : RuntimeSpriteFactory.Circle;
             shadowRenderer.sprite = objectSprite;
             edgeRenderer.sprite = objectSprite;
-            var canRenderContourKind = interactionObject.Kind == InteractionObjectKind.Hand ||
-                                       interactionObject.Kind == InteractionObjectKind.BarProp;
-            var shouldRenderContour = canRenderContourKind &&
+            var shouldRenderContour = interactionObject.Kind == InteractionObjectKind.Hand &&
                                       interactionObject.ShapeKind == InteractionShapeKind.Contour &&
                                       interactionObject.ContourPoints.Count >= 3;
 
@@ -74,8 +72,8 @@ namespace LittlePeopleWorld.Unity
             fieldRenderer.enabled = debugEnabled;
             if (debugEnabled)
             {
-                fieldRenderer.sprite = isBar ? RuntimeSpriteFactory.Square : RuntimeSpriteFactory.Circle;
-                var fieldScale = isBar
+                fieldRenderer.sprite = isMaskStroke ? RuntimeSpriteFactory.Square : RuntimeSpriteFactory.Circle;
+                var fieldScale = isMaskStroke
                     ? mapper.ToWorldScale(new Vector2(interactionObject.Size.x + field.Radius * 1.6f, Mathf.Max(interactionObject.Size.y + field.Radius * 1.25f, interactionObject.Size.y * 2.6f)))
                     : Vector3.one * mapper.ToWorldRadius(field.Radius) * 2f;
                 fieldRenderer.transform.localScale = fieldScale;

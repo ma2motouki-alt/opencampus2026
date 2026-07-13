@@ -26,13 +26,13 @@ The domain world does not know which provider produced the input.
 
 - `1`: hand
 - `2`: round prop
-- `3`: bar prop
+- `3`: temporary development mask stroke
 - `4`: observation mode, ignore mouse editing
 - Left click: place or select
 - Drag: move selected object
 - Wheel: resize selected object
-- `R`: rotate bar clockwise
-- `Shift + R`: rotate bar counter-clockwise
+- `R`: rotate selected primitive clockwise
+- `Shift + R`: rotate selected primitive counter-clockwise
 - `Delete` / `Backspace` / `X`: delete selected object
 - `D`: toggle debug overlays
 
@@ -74,10 +74,9 @@ Current supported `kind` values:
 
 - `hand`
 - `round_prop`
-- `bar_prop`
 - `block_prop`
 
-Unknown or omitted kind falls back to `bar_prop` in the Unity parser.
+Unknown or omitted kind falls back to `hand` in the Unity parser. Legacy `bar`, `stick`, and `bar_prop` values are also treated as hand input.
 
 ## Shape
 
@@ -87,21 +86,10 @@ Rules:
 
 - `points` must be ordered around the contour.
 - `x/y/w/h` remain required as center and bounding-size fallback.
-- `angle` is mainly used by primitive bar fallback.
+- `angle` is used by primitive fallback rendering.
 - `points` are used for contour fill display and contour distance.
 
 If no valid contour is present, Unity uses primitive rendering and primitive reaction logic.
-
-## Bar Prop
-
-For `bar_prop`, Unity derives:
-
-- `WalkableSurface[]`
-- `PropObstacle[]`
-
-These are never sent by Python. They are rebuilt in Unity from the current input objects.
-
-Python may still send contour points for bar-like objects so the visible object shape can match the detected region.
 
 ## Ambient Objects
 

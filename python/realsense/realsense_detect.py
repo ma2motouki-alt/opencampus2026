@@ -6,14 +6,12 @@ import time
 import cv2
 from config import (
     CALIBRATION_PATH,
-    CLASSIFIER_MODE,
     DEBUG_PRINT_OBJECT_SUMMARY,
     DEBUG_PRINT_SUMMARY_INTERVAL_SECONDS,
     DEBUG_PREVIEW,
     DEBUG_SHOW_HEIGHT_MAP,
     DEBUG_SHOW_MASK_STAGES,
     DEBUG_SHOW_REJECTED_CONTOURS,
-    DEFAULT_OBJECT_KIND,
     FLIP_X,
     FLIP_Y,
     MAPPER_MODE,
@@ -38,8 +36,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Detect RealSense hand contours and send Unity UDP JSON.")
     parser.add_argument("--host", default=UDP_HOST)
     parser.add_argument("--port", type=int, default=UDP_PORT)
-    parser.add_argument("--kind", default=DEFAULT_OBJECT_KIND)
-    parser.add_argument("--classifier-mode", choices=("auto", "fixed"), default=CLASSIFIER_MODE)
     parser.add_argument("--mapper", choices=("front", "homography"), default=MAPPER_MODE)
     parser.add_argument("--calibration", default=CALIBRATION_PATH)
     parser.add_argument("--no-preview", action="store_true")
@@ -96,8 +92,6 @@ def main() -> None:
                     mapper,
                     image_width,
                     image_height,
-                    args.kind,
-                    args.classifier_mode,
                 )
                 objects = tracker.assign_ids(raw_objects, time.monotonic())
                 sender.send_frame(frame_index, time.monotonic(), objects)

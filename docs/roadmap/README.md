@@ -12,7 +12,7 @@
 
 - Unity 2D による展示ワールド
 - 画面縁を生活圏とする小人の移動
-- 棒状物体の外周歩行、乗り移り、落下
+- 虹への乗り移り、歩行、落下
 - RealSense D435 + Python による depth contour input
 - UDP JSON による Unity 入力
 - 手や物体の contour fill 表示
@@ -46,11 +46,8 @@
 - UDP RealSense input provider
 - Python RealSense contour detection
 - EdgeWalk
-- BarProp 由来の実物長辺 `WalkableSurface`
-- Surface transfer / surface walk / ride / falling
-- Surface-to-surface transfer
-- 傾いた棒の片側乗り制限
-- `PropObstacle`
+- Rainbow 由来の曲線 `WalkableSurface`
+- Surface transfer / surface walk / falling
 - Hand contour reaction
 - Contour mesh fill
 - Ambient cloud / star
@@ -66,7 +63,7 @@
 | Milestone | File | Current Meaning |
 |---|---|---|
 | 1 | [milestone1-roadmap.md](milestone1-roadmap.md) | Documentation and architecture sync |
-| 2 | [milestone2-roadmap.md](milestone2-roadmap.md) | Bar walking and surface behavior |
+| 2 | [milestone2-roadmap.md](milestone2-roadmap.md) | Retired bar-surface prototype |
 | 3 | [milestone3-roadmap.md](milestone3-roadmap.md) | UseCase and domain boundary |
 | 4 | [milestone4-roadmap.md](milestone4-roadmap.md) | Cloud / star / rain reactions |
 | 5 | [milestone5-roadmap.md](milestone5-roadmap.md) | Visual replacement and animation layer |

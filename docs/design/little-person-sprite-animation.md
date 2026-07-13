@@ -69,7 +69,7 @@ Assets/
 - `LittlePerson.ArchetypeId` から画像セットを選ぶ
 - 小人が動いている時だけ2フレームを交互表示する
 - `EdgeWalk` 中は画面の最寄り辺から足元方向を決める
-- `SurfaceWalk` / `RideSurface` などは速度方向を基準に回転する
+- `SurfaceWalk` は速度方向を基準に回転する
 - sprite が読み込めない場合は従来の円表示へフォールバックする
 
 ## Edge Rotation Rule

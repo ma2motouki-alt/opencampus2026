@@ -2,7 +2,7 @@
 
 This document describes the parameters used by the current `main` branch.
 
-Most visual tuning happens in `Assets/Scripts/LittlePeopleWorld/Unity/WorldSpaceMaskAnimationController.cs`. Domain-level tuning and effect defaults are in `Assets/Scripts/LittlePeopleWorld/Master/Masters.cs`.
+Most visual tuning happens in `Assets/Scripts/LittlePeopleWorld/Unity/WorldSpaceMaskAnimationController.cs`. Domain-level tuning types are under `Assets/Scripts/LittlePeopleWorld/Master/`, and the current default records are assembled in `MasterDatabase.cs`.
 
 ## Unity Inspector Parameters
 
@@ -104,7 +104,7 @@ The cloud contact radius itself is defined in `AmbientObjectTypeMaster`.
 |---|---:|---|
 | `enableRainOcclusionByMask` | `true` | Prevent rain from reaching the ground when the vertical rain path intersects the current recognition mask. |
 | `rainOcclusionProbeRadiusPx` | `1` | Horizontal mask-pixel radius checked around each falling rain sample. Higher values make occlusion easier to trigger. |
-| `rainOcclusionTopPaddingPx` | `1` | Skips a small area just below the rain origin to avoid immediate self-blocking near the cloud/rain source. |
+| `rainOcclusionTopPaddingPx` | `15` | Minimum vertical distance from the cloud, in mask pixels, before a recognition mask can block rain. Increase it to allow touching near the cloud without clipping the rain. |
 | `showRainOcclusionDebug` | `false` | Adds rain occlusion counters to the debug overlay when `D` debug display is enabled. |
 | `enableRainVisualOcclusion` | `true` | Shorten the visible rain column when its path intersects the current recognition mask. |
 | `rainOcclusionVisualSmoothingSeconds` | `0.12` | Smooths visible rain-height changes to reduce flicker from noisy masks. Set to `0` for immediate clipping. |
@@ -169,7 +169,7 @@ Flower burst is triggered when a hand contour touches the flower area. It does n
 
 ### Cloud
 
-Location: `Assets/Scripts/LittlePeopleWorld/Master/Masters.cs`
+Location: `Assets/Scripts/LittlePeopleWorld/Master/MasterDatabase.cs`
 
 Current cloud master:
 
@@ -225,7 +225,7 @@ Important values:
 - Duration: `0.45`
 - Drop size scale: `0.4`
 
-`RainLingerSeconds` is currently `5.0`. Touching a cloud keeps rain active for about five seconds after the last touch refresh.
+`RainLingerSeconds` is currently `2.0`. Touching a cloud keeps rain active for about two seconds after the last touch refresh.
 
 ### Star
 
@@ -241,16 +241,12 @@ Important current values:
 |---|---:|
 | `MIN_CONTOUR_AREA_PIXELS` | `500` |
 | `MORPH_KERNEL_SIZE` | `5` |
-| `CLASSIFIER_MODE` | `auto` |
 | `MAPPER_MODE` | `front` |
 | `HAND_MIN_CONTOUR_AREA_PIXELS` | `800` |
 | `HAND_MAX_CONTOUR_AREA_PIXELS` | `80000` |
 | `HAND_APPROX_EPSILON_RATIO` | `0.005` |
 | `HAND_MAX_POINTS` | `80` |
 | `HAND_MIN_POINTS` | `8` |
-| `BAR_MIN_ASPECT_RATIO` | `3.0` |
-| `BAR_MIN_LENGTH_NORMALIZED` | `0.08` |
-| `BAR_MAX_THICKNESS_NORMALIZED` | `0.12` |
 
 ## Exhibition Mode Notes
 

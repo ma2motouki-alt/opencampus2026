@@ -30,4 +30,4 @@
 
 ## Handoff Notes
 
-Do not put asset-specific rules into `DomainModels.cs`. Keep replacement boundaries in Unity view classes.
+Do not put asset-specific rules into the files under `Domain/`. Keep replacement boundaries in Unity view classes.

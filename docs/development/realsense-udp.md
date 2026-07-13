@@ -46,8 +46,6 @@ Useful options:
 
 ```powershell
 python realsense_detect.py --no-preview
-python realsense_detect.py --kind hand
-python realsense_detect.py --classifier-mode auto
 python realsense_detect.py --mapper front
 python realsense_detect.py --mapper homography --calibration calibration.json
 ```
@@ -86,7 +84,7 @@ Coordinate rules:
 - Origin is top-left.
 - `x` increases right.
 - `y` increases down.
-- `angle` is degrees and mainly used for primitive bar fallback.
+- `angle` is retained for protocol compatibility; hand contours currently send `0`.
 
 ## Detection Strategy
 
@@ -100,7 +98,7 @@ Current MVP uses:
 - `cv2.findContours`.
 - Area filtering.
 - `cv2.approxPolyDP`.
-- Optional slender-object classification.
+- Hand contour conversion.
 - Nearest-neighbor tracking.
 - UDP JSON send.
 

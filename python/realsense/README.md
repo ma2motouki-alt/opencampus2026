@@ -4,7 +4,7 @@ This folder contains the Python side of the RealSense / UDP input pipeline.
 
 ## Purpose
 
-Detect hands and objects with RealSense depth, convert detected contours to normalized display coordinates, and send them to Unity as `InteractionObject` JSON.
+Detect foreground hand regions with RealSense depth, convert their contours to normalized display coordinates, and send them to Unity as `InteractionObject` JSON.
 
 ## Current Assumption
 
@@ -29,7 +29,6 @@ pip install -r requirements.txt
 
 ```powershell
 python test_sender.py --kind hand
-python test_sender.py --kind bar_prop
 ```
 
 ## Run With RealSense
@@ -44,8 +43,6 @@ The script captures an empty baseline after startup. Keep the display empty unti
 
 ```powershell
 python realsense_detect.py --no-preview
-python realsense_detect.py --classifier-mode auto
-python realsense_detect.py --classifier-mode fixed --kind hand
 python realsense_detect.py --mapper front
 python realsense_detect.py --mapper homography --calibration calibration.json
 ```
@@ -61,7 +58,7 @@ RealSense depth
   -> contour detection
   -> contour filtering
   -> contour simplification
-  -> classification
+  -> hand contour conversion
   -> tracking
   -> UDP JSON
 ```
@@ -74,7 +71,6 @@ Location: `config.py`
 |---|---:|
 | `MIN_CONTOUR_AREA_PIXELS` | `500` |
 | `MORPH_KERNEL_SIZE` | `5` |
-| `CLASSIFIER_MODE` | `auto` |
 | `MAPPER_MODE` | `front` |
 | `HAND_MIN_CONTOUR_AREA_PIXELS` | `800` |
 | `HAND_MAX_CONTOUR_AREA_PIXELS` | `80000` |
@@ -82,18 +78,7 @@ Location: `config.py`
 | `HAND_MAX_POINTS` | `80` |
 | `HAND_MIN_POINTS` | `8` |
 | `HAND_MAX_ASPECT_RATIO` | `4.5` |
-| `BAR_MIN_ASPECT_RATIO` | `3.0` |
-| `BAR_MIN_LENGTH_NORMALIZED` | `0.08` |
-| `BAR_MAX_THICKNESS_NORMALIZED` | `0.12` |
-
-## Classification
-
-With `CLASSIFIER_MODE = "auto"`:
-
-- slender contours become `kind = "bar_prop"`,
-- other valid contours become `kind = "hand"`.
-
-Both can include:
+All accepted contours are sent as `kind = "hand"` and can include:
 
 ```json
 {
