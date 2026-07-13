@@ -18,13 +18,16 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] float startledPulseScale = 0.12f;
         [SerializeField] float fallingSpinDegrees = 10f;
 
+        [Header("Rainbow Walking")]
+        [SerializeField] float rainbowSpriteUpOffsetRatio = 0.22f;
+
         [Header("Plant Look")]
         [SerializeField] float plantLookChancePerSecond = 0.38f;
         [SerializeField] Vector2 plantLookDurationSeconds = new Vector2(1f, 12f);
         [SerializeField] float plantLookCooldownSeconds = 2.0f;
 
         [Header("Leaf Hang")]
-        [SerializeField] Vector2 leafHangDurationSeconds = new Vector2(10f, 20f);
+        [SerializeField] Vector2 leafHangDurationSeconds = new Vector2(20f, 30f);
         [SerializeField] float leafHangCooldownSeconds = 2.5f;
         [SerializeField] float leafHangFrameSeconds = 0.18f;
         [SerializeField] float leafHangSpriteDownOffsetRatio = 0.72f;
@@ -113,6 +116,10 @@ namespace LittlePeopleWorld.Unity
             var isDroppingFromLeaf = leafDropTimer > 0f;
             var isHangingFromLeaf = leafHangTimer > 0f;
             var isLookingAtPlant = plantLookTimer > 0f && !isHangingFromLeaf && !isDroppingFromLeaf;
+            var isWalkingOnRainbow = person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow &&
+                                     (person.CurrentBehavior == LittlePersonBehaviorKind.TransferToSurface ||
+                                      person.CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk ||
+                                      person.CurrentBehavior == LittlePersonBehaviorKind.RideSurface);
             var isLookingAtHand = !isLookingAtPlant &&
                                   person.CurrentBehavior == LittlePersonBehaviorKind.EdgeWalk &&
                                   person.Emotion == LittlePersonEmotion.Startled;
@@ -147,7 +154,9 @@ namespace LittlePeopleWorld.Unity
             var spriteScale = hasSprite ? ScaleForTargetHeight(spriteRenderer.sprite, targetHeight) : unit;
             spriteRenderer.transform.localPosition = isHangingFromLeaf || isDroppingFromLeaf
                 ? new Vector3(0f, -targetHeight * leafHangSpriteDownOffsetRatio, 0f)
-                : Vector3.zero;
+                : isWalkingOnRainbow
+                    ? new Vector3(0f, targetHeight * rainbowSpriteUpOffsetRatio, 0f)
+                    : Vector3.zero;
             spriteRenderer.transform.localRotation = isDroppingFromLeaf
                 ? Quaternion.Euler(0f, 0f, Mathf.Sin(Time.time * 10f + animationSeed) * fallingSpinDegrees)
                 : Quaternion.identity;
@@ -155,6 +164,7 @@ namespace LittlePeopleWorld.Unity
 
             var glowColor = GlowColor(person, archetype.BodyColor);
             glowColor.a = GlowAlpha(person);
+            glowRenderer.enabled = !isWalkingOnRainbow;
             glowRenderer.color = glowColor;
             glowRenderer.transform.localPosition = hasSprite
                 ? new Vector3(0f, targetHeight * 0.42f, 0f)
@@ -343,6 +353,18 @@ namespace LittlePeopleWorld.Unity
 
         float RotationDegrees(LittlePerson person)
         {
+            if (person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow &&
+                person.Velocity.sqrMagnitude > 0.000001f)
+            {
+                var rainbowVelocity = NormalizedVelocityToWorldDirection(person.Velocity);
+                if (rainbowVelocity.x < 0f)
+                {
+                    rainbowVelocity = -rainbowVelocity;
+                }
+
+                return Mathf.Atan2(rainbowVelocity.y, rainbowVelocity.x) * Mathf.Rad2Deg;
+            }
+
             if (person.CurrentBehavior == LittlePersonBehaviorKind.EdgeWalk)
             {
                 return EdgeGroundRotationDegrees(person.Position);
@@ -434,6 +456,11 @@ namespace LittlePeopleWorld.Unity
             if (person.Velocity.sqrMagnitude <= 0.000001f)
             {
                 return false;
+            }
+
+            if (person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow)
+            {
+                return person.Velocity.x < 0f;
             }
 
             var rotation = RotationDegrees(person);

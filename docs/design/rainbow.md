@@ -49,11 +49,27 @@ One rainbow creates two directed `WalkableSurface` values:
 
 Both use `WalkableSurfaceShape.Polyline`. Little people attach at a foot, walk along the colored top band, and return to `EdgeWalk` at the opposite foot.
 
+Rainbow surfaces use positive IDs in a reserved range. `-1` remains the domain sentinel for "no active surface", so a rainbow path is not lost immediately after boarding. Runtime interaction objects no longer generate bar-derived walkable surfaces or prop obstacles; the active surface system is dedicated to rainbow walking.
+
 Defaults:
 
 - Attach distance: `0.055`
 - Walk speed: `0.13`
 - Surface width: `0.018`
+- Transfer duration: `0.22 seconds`
+- Exit dwell: `0.20 seconds`
+- Detach distance: `0.22`
+- Reconnect cooldown: `1.10 seconds`
+
+The sprite is positioned so its feet, rather than its center, sit on the path. Its body follows the local slope while remaining upright at the apex.
+
+## Development Debug
+
+Press `Y` during Play mode to create a rainbow immediately. This ignores flower, rain, and cooldown conditions, but still requires the world to contain a cloud and the fixed sun. The debug overlay shows `Rainbows` and `Rainbow walkers` counts. Press `D` first if the overlay is hidden.
+
+## Audio
+
+Each successful rainbow creation increments `World.RainbowSpawnSequence`. `WorldAudioController` detects that increment and plays `Assets/Audio/SFX/虹.mp3` once through the shared one-shot AudioSource. Normal condition-based rainbows and the `Y` development rainbow use the same event.
 
 ## Touch And Falling
 

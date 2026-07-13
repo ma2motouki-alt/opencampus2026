@@ -52,7 +52,7 @@ namespace LittlePeopleWorld.Unity
         [Header("Particles")]
         [SerializeField] int particleCount = 80;
         [SerializeField] float particleSize = 0.10f;
-        [SerializeField] float speedPxPerSec = 55f;
+        [SerializeField] float speedPxPerSec = 25f;
         [SerializeField] float steerLerp = 6f;
         [SerializeField] Color[] particlePalette =
         {
@@ -67,10 +67,10 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] bool showParticleWings = true;
         [SerializeField] float particleWingSideOffsetRatio = 0.44f;
         [SerializeField] float particleWingBackOffsetRatio = -0.08f;
-        [SerializeField] float particleWingWidthRatio = 0.42f;
+        [SerializeField] float particleWingWidthRatio = 0.82f;
         [SerializeField] float particleWingLengthRatio = 2f;
         [SerializeField] float particleWingAlpha = 0.52f;
-        [SerializeField] float particleWingFlapSpeed = 14f;
+        [SerializeField] float particleWingFlapSpeed = 10f;
 
         [Header("Particle Separation")]
         [SerializeField] float separationRadiusPx = 8f;

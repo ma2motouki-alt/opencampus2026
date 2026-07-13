@@ -1080,6 +1080,8 @@ namespace LittlePeopleWorld.Domain
     }
     public sealed class RainbowInstance
     {
+        const int SurfaceIdBase = 1000000;
+        const int SourceIdBase = 2000000;
         readonly List<Vector2> pathPoints = new();
         readonly List<Vector2> reversedPathPoints = new();
 
@@ -1145,7 +1147,7 @@ namespace LittlePeopleWorld.Domain
             var halfSpan = master.SpanNormalized * 0.5f;
             var minCenterX = edgePadding + halfSpan;
             var maxCenterX = 1f - edgePadding - halfSpan;
-            var requestedCenterX = (cloudPosition.x + sunPosition.x) * 0.5f;
+            var requestedCenterX = 0.5f;
             var centerX = minCenterX <= maxCenterX
                 ? Mathf.Clamp(requestedCenterX, minCenterX, maxCenterX)
                 : 0.5f;
@@ -1199,8 +1201,8 @@ namespace LittlePeopleWorld.Domain
                 return;
             }
 
-            AddSurface(destination, master, pathPoints, -Id * 10 - 1, 1);
-            AddSurface(destination, master, reversedPathPoints, -Id * 10 - 2, -1);
+            AddSurface(destination, master, pathPoints, SurfaceIdBase + Id * 10 + 1, 1);
+            AddSurface(destination, master, reversedPathPoints, SurfaceIdBase + Id * 10 + 2, -1);
         }
 
         void AddSurface(
@@ -1214,7 +1216,7 @@ namespace LittlePeopleWorld.Domain
             var end = points[points.Count - 1];
             destination.Add(new WalkableSurface(
                 surfaceId,
-                -Id,
+                SourceIdBase + Id,
                 null,
                 InteractionObjectState.Placed,
                 Vector2.zero,
@@ -1250,6 +1252,7 @@ namespace LittlePeopleWorld.Domain
         float barSideOffsetDistance;
         int surfaceId = -1;
         int surfaceSourceObjectId = -1;
+        WalkableSurfaceKind? activeSurfaceKind;
         float surfaceProgress;
         bool surfaceExitReached;
         float surfaceExitDwellTimer;
@@ -1285,6 +1288,7 @@ namespace LittlePeopleWorld.Domain
         public float EdgeProgress => edgeProgress;
         public int BarSourceObjectId => barSourceObjectId;
         public int SurfaceId => surfaceId;
+        public WalkableSurfaceKind? ActiveSurfaceKind => activeSurfaceKind;
 
         public LittlePerson(
             Guid id,
@@ -1389,6 +1393,7 @@ namespace LittlePeopleWorld.Domain
             barSourceObjectId = -1;
             surfaceId = -1;
             surfaceSourceObjectId = -1;
+            activeSurfaceKind = null;
             surfaceExitReached = false;
             surfaceExitDwellTimer = 0f;
 
@@ -1509,7 +1514,8 @@ namespace LittlePeopleWorld.Domain
                     continue;
                 }
 
-                if (!surface.CanAttachFrom(probePosition, surfaceMaster.AttachSideTolerance))
+                if (surface.Kind == WalkableSurfaceKind.Bar &&
+                    !surface.CanAttachFrom(probePosition, surfaceMaster.AttachSideTolerance))
                 {
                     continue;
                 }
@@ -1536,6 +1542,7 @@ namespace LittlePeopleWorld.Domain
 
             surfaceId = selected.Id;
             surfaceSourceObjectId = selected.SourceObjectId;
+            activeSurfaceKind = selected.Kind;
             barSourceObjectId = selected.SourceObjectId;
             surfaceProgress = selectedProgress;
             surfaceExitReached = false;
@@ -1543,7 +1550,9 @@ namespace LittlePeopleWorld.Domain
             transferStart = transferOrigin;
             transferEnd = selectedPoint;
             transferTimer = 0f;
-            transferDurationSeconds = surfaceMaster.TransferDurationSeconds;
+            transferDurationSeconds = selected.Kind == WalkableSurfaceKind.Rainbow
+                ? masters.Rainbows.Get(1).TransferDurationSeconds
+                : surfaceMaster.TransferDurationSeconds;
             transferTargetProgress = selectedProgress;
             TargetObjectId = selected.SourceObjectId;
             CurrentBehavior = LittlePersonBehaviorKind.TransferToSurface;
@@ -1652,6 +1661,7 @@ namespace LittlePeopleWorld.Domain
             TargetObjectId = surface.SourceObjectId;
             barSourceObjectId = surface.SourceObjectId;
             surfaceSourceObjectId = surface.SourceObjectId;
+            activeSurfaceKind = surface.Kind;
             EnsureReaction(masters.Reactions.Get(4));
 
             var previous = Position;
@@ -1683,7 +1693,8 @@ namespace LittlePeopleWorld.Domain
                 return;
             }
 
-            if (surface.SourceVelocity.magnitude > surfaceMaster.RideVelocityLimit)
+            if (surface.Kind == WalkableSurfaceKind.Bar &&
+                surface.SourceVelocity.magnitude > surfaceMaster.RideVelocityLimit)
             {
                 StartFalling(tuning, Position);
                 AdvanceFalling(deltaTime, tuning);
@@ -1693,6 +1704,7 @@ namespace LittlePeopleWorld.Domain
             TargetObjectId = surface.SourceObjectId;
             barSourceObjectId = surface.SourceObjectId;
             surfaceSourceObjectId = surface.SourceObjectId;
+            activeSurfaceKind = surface.Kind;
             Emotion = LittlePersonEmotion.Curious;
             EnsureReaction(masters.Reactions.Get(4));
 
@@ -1703,11 +1715,14 @@ namespace LittlePeopleWorld.Domain
                 Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
                 surfaceExitDwellTimer += Mathf.Max(0f, deltaTime);
 
-                if (surfaceExitDwellTimer >= surfaceMaster.SurfaceExitDwellSeconds)
+                var exitDwellSeconds = surface.Kind == WalkableSurfaceKind.Rainbow
+                    ? masters.Rainbows.Get(1).ExitDwellSeconds
+                    : surfaceMaster.SurfaceExitDwellSeconds;
+                if (surfaceExitDwellTimer >= exitDwellSeconds)
                 {
                     if (surface.Kind == WalkableSurfaceKind.Rainbow)
                     {
-                        CompleteRainbowWalk(surface, tuning);
+                        CompleteRainbowWalk(surface, tuning, masters);
                         return;
                     }
 
@@ -1722,7 +1737,7 @@ namespace LittlePeopleWorld.Domain
                 return;
             }
 
-            if (surface.IsDragging)
+            if (surface.Kind == WalkableSurfaceKind.Bar && surface.IsDragging)
             {
                 CurrentBehavior = LittlePersonBehaviorKind.RideSurface;
             }
@@ -1748,7 +1763,10 @@ namespace LittlePeopleWorld.Domain
             }
 
             var next = surface.PositionAt(surfaceProgress);
-            if (Vector2.Distance(previous, next) > surfaceMaster.DetachDistance)
+            var detachDistance = surface.Kind == WalkableSurfaceKind.Rainbow
+                ? masters.Rainbows.Get(1).DetachDistance
+                : surfaceMaster.DetachDistance;
+            if (Vector2.Distance(previous, next) > detachDistance)
             {
                 StartFalling(tuning, previous);
                 AdvanceFalling(deltaTime, tuning);
@@ -1758,7 +1776,7 @@ namespace LittlePeopleWorld.Domain
             Position = next;
             Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
         }
-        void CompleteRainbowWalk(WalkableSurface surface, TuningParameterMaster tuning)
+        void CompleteRainbowWalk(WalkableSurface surface, TuningParameterMaster tuning, MasterDatabase masters)
         {
             edgeProgress = ClosestProgressOnEdge(surface.PathEndPoint, tuning.WorldEdgePadding, out var edgePoint);
             Position = edgePoint;
@@ -1769,10 +1787,11 @@ namespace LittlePeopleWorld.Domain
             barSourceObjectId = -1;
             surfaceId = -1;
             surfaceSourceObjectId = -1;
+            activeSurfaceKind = null;
             surfaceExitReached = false;
             surfaceExitDwellTimer = 0f;
             climbCooldownSourceObjectId = surface.SourceObjectId;
-            climbCooldownTimer = tuning.SurfaceReconnectCooldownSeconds;
+            climbCooldownTimer = masters.Rainbows.Get(1).ReconnectCooldownSeconds;
 
             var tangent = surface.Tangent();
             if (Mathf.Abs(tangent.x) > 0.0001f)
@@ -2010,6 +2029,7 @@ namespace LittlePeopleWorld.Domain
                 barSourceObjectId = -1;
                 surfaceId = -1;
                 surfaceSourceObjectId = -1;
+                activeSurfaceKind = null;
                 edgeDirection = fallExitEdgeDirection;
                 climbCooldownSourceObjectId = fallSourceObjectId;
                 climbCooldownTimer = tuning.SurfaceReconnectCooldownSeconds;
@@ -2034,6 +2054,7 @@ namespace LittlePeopleWorld.Domain
             barSourceObjectId = -1;
             surfaceId = -1;
             surfaceSourceObjectId = -1;
+            activeSurfaceKind = null;
             surfaceExitReached = false;
             surfaceExitDwellTimer = 0f;
         }
@@ -2341,6 +2362,7 @@ namespace LittlePeopleWorld.Domain
         readonly HashSet<Guid> movementPausedLittlePersonIds = new();
         int nextVisualEffectId = 1;
         int nextRainbowId = 1;
+        int rainbowSpawnSequence;
         int nextDevelopmentRainSourceId = -100000;
         int activeBloomCount;
         bool rainbowConditionLatched;
@@ -2355,6 +2377,7 @@ namespace LittlePeopleWorld.Domain
         public IReadOnlyList<AmbientObject> AmbientObjects => ambientObjects;
         public IReadOnlyList<VisualEffectInstance> VisualEffects => visualEffects;
         public IReadOnlyList<RainbowInstance> Rainbows => rainbows;
+        public int RainbowSpawnSequence => rainbowSpawnSequence;
 
         public void SetDisplayAspect(float aspect)
         {
@@ -2413,19 +2436,75 @@ namespace LittlePeopleWorld.Domain
             walkableSurfaces.Clear();
             propObstacles.Clear();
 
-            var surfaceMaster = masters.WalkableSurfaces.Get(1);
             if (objects != null)
             {
                 foreach (var interactionObject in objects)
                 {
                     interactionObjects.Add(interactionObject);
                     interactionFields.Add(interactionObject.CreateField(masters));
-                    WalkableSurface.AddFromInteractionObject(interactionObject, surfaceMaster, walkableSurfaces, displayAspect);
-                    PropObstacle.AddFromInteractionObject(interactionObject, surfaceMaster, propObstacles, displayAspect);
                 }
             }
 
             RebuildRainbowSurfaces(masters);
+        }
+
+        public bool TriggerDevelopmentRainbow(MasterDatabase masters)
+        {
+            if (masters == null || rainbows.Count > 0)
+            {
+                return false;
+            }
+
+            AmbientObject sun = null;
+            AmbientObject selectedCloud = null;
+            foreach (var ambientObject in ambientObjects)
+            {
+                if (ambientObject.Kind == AmbientObjectKind.Star)
+                {
+                    sun = ambientObject;
+                    break;
+                }
+            }
+
+            if (sun == null)
+            {
+                return false;
+            }
+
+            var bestDistance = -1f;
+            foreach (var ambientObject in ambientObjects)
+            {
+                if (ambientObject.Kind != AmbientObjectKind.Cloud)
+                {
+                    continue;
+                }
+
+                var distance = Vector2.Distance(ambientObject.Position, sun.Position);
+                if (distance > bestDistance)
+                {
+                    selectedCloud = ambientObject;
+                    bestDistance = distance;
+                }
+            }
+
+            if (selectedCloud == null)
+            {
+                return false;
+            }
+
+            var tuning = masters.TuningParameters.Get(1);
+            rainbows.Add(new RainbowInstance(
+                nextRainbowId++,
+                selectedCloud.Id,
+                selectedCloud.Position,
+                sun.Position,
+                tuning.WorldEdgePadding,
+                masters.Rainbows.Get(1)));
+            rainbowSpawnSequence++;
+            rainbowConditionLatched = true;
+            rainbowCooldownSeconds = 0f;
+            RebuildRainbowSurfaces(masters);
+            return true;
         }
 
         public void TriggerDevelopmentRain(MasterDatabase masters, Vector2 position, float width, float durationSeconds)
@@ -2533,6 +2612,7 @@ namespace LittlePeopleWorld.Domain
                 sun.Position,
                 tuning.WorldEdgePadding,
                 rainbowMaster));
+            rainbowSpawnSequence++;
             rainbowConditionLatched = true;
         }
 

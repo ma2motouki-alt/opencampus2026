@@ -315,6 +315,10 @@ namespace LittlePeopleWorld.Master
         public float WalkSpeed { get; }
         public float SurfaceWidth { get; }
         public float TouchPadding { get; }
+        public float TransferDurationSeconds { get; }
+        public float ExitDwellSeconds { get; }
+        public float DetachDistance { get; }
+        public float ReconnectCooldownSeconds { get; }
 
         public RainbowMaster(
             int id,
@@ -331,7 +335,11 @@ namespace LittlePeopleWorld.Master
             float attachDistance,
             float walkSpeed,
             float surfaceWidth,
-            float touchPadding)
+            float touchPadding,
+            float transferDurationSeconds,
+            float exitDwellSeconds,
+            float detachDistance,
+            float reconnectCooldownSeconds)
         {
             Id = id;
             Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -348,6 +356,10 @@ namespace LittlePeopleWorld.Master
             WalkSpeed = Mathf.Max(0.001f, walkSpeed);
             SurfaceWidth = Mathf.Max(0.001f, surfaceWidth);
             TouchPadding = Mathf.Max(0f, touchPadding);
+            TransferDurationSeconds = Mathf.Max(0.001f, transferDurationSeconds);
+            ExitDwellSeconds = Mathf.Max(0f, exitDwellSeconds);
+            DetachDistance = Mathf.Max(0.001f, detachDistance);
+            ReconnectCooldownSeconds = Mathf.Max(0f, reconnectCooldownSeconds);
         }
     }
 
@@ -578,10 +590,10 @@ namespace LittlePeopleWorld.Master
 
             var littlePeople = new[]
             {
-                new LittlePersonArchetypeMaster(1, "blue walker", new Color(0.45f, 0.76f, 1f, 1f), 0.018f, 0.13f, 0.78f, 0.35f),
-                new LittlePersonArchetypeMaster(2, "green walker", new Color(0.55f, 1f, 0.72f, 1f), 0.017f, 0.12f, 0.58f, 0.66f),
-                new LittlePersonArchetypeMaster(3, "red walker", new Color(1f, 0.48f, 0.45f, 1f), 0.016f, 0.15f, 0.9f, 0.28f),
-                new LittlePersonArchetypeMaster(4, "yellow walker", new Color(1f, 0.95f, 0.45f, 1f), 0.017f, 0.135f, 0.72f, 0.42f)
+                new LittlePersonArchetypeMaster(1, "blue walker", new Color(0.45f, 0.76f, 1f, 1f), 0.018f, 0.12f, 0.78f, 0.35f),
+                new LittlePersonArchetypeMaster(2, "green walker", new Color(0.55f, 1f, 0.72f, 1f), 0.017f, 0.11f, 0.58f, 0.66f),
+                new LittlePersonArchetypeMaster(3, "red walker", new Color(1f, 0.48f, 0.45f, 1f), 0.025f, 0.18f, 0.9f, 0.28f),
+                new LittlePersonArchetypeMaster(4, "yellow walker", new Color(1f, 0.95f, 0.45f, 1f), 0.017f, 0.125f, 0.72f, 0.42f)
             };
 
             var behaviorProfiles = new[]
@@ -619,7 +631,7 @@ namespace LittlePeopleWorld.Master
 
             var rainbows = new[]
             {
-                new RainbowMaster(1, "rare rain-and-bloom rainbow", 4, 0.50f, 8f, 0.5f, 1.2f, 30f, 0.48f, 0.33f, 32, 0.055f, 0.13f, 0.018f, 0.02f)
+                new RainbowMaster(1, "rare rain-and-bloom rainbow", 4, 0.50f, 8f, 0.5f, 1.2f, 30f, 0.78f, 0.45f, 32, 0.055f, 0.13f, 0.018f, 0.02f, 0.22f, 0.2f, 0.22f, 1.1f)
             };
 
             var objectTypes = new[]

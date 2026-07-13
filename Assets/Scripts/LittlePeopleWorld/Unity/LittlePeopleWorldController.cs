@@ -29,7 +29,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] WorldAudioController audioController;
         [Header("Little Person Plant Look")]
         [SerializeField] bool enableLittlePersonPlantLook = true;
-        [SerializeField] float littlePersonPlantLookRadius = 0.95f;
+        [SerializeField] float littlePersonPlantLookRadius = 1.15f;
         [Header("Little Person Leaf Hang")]
         [SerializeField] bool enableLittlePersonLeafHang = true;
         [SerializeField] float littlePersonLeafHangTouchRadius = 0.45f;
@@ -39,6 +39,9 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] bool enableDevelopmentClickRain = true;
         [SerializeField] float developmentRainDurationSeconds = 2.0f;
         [SerializeField] float developmentRainWidth = 0.08f;
+        [Header("Development Rainbow")]
+        [SerializeField] bool enableDevelopmentRainbowKey = true;
+        [SerializeField] KeyCode developmentRainbowKey = KeyCode.Y;
 
         readonly List<LittlePersonView> littlePersonViews = new();
         readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
@@ -94,6 +97,7 @@ namespace LittlePeopleWorld.Unity
             orchestrator.AdvanceFrame(Time.deltaTime, inputProvider?.InteractionObjects ?? Array.Empty<InteractionObject>());
             world = orchestrator.World;
             HandleDevelopmentClickRain();
+            HandleDevelopmentRainbow();
 
             SyncLittlePeopleViews();
             SyncInteractionObjectViews();
@@ -133,6 +137,19 @@ namespace LittlePeopleWorld.Unity
             world.TriggerDevelopmentRain(masters, normalizedPosition, developmentRainWidth, developmentRainDurationSeconds);
         }
 
+        void HandleDevelopmentRainbow()
+        {
+            if (!enableDevelopmentRainbowKey || world == null || masters == null)
+            {
+                return;
+            }
+
+            if (UnityEngine.Input.GetKeyDown(developmentRainbowKey))
+            {
+                world.TriggerDevelopmentRainbow(masters);
+            }
+        }
+
         void OnGUI()
         {
             var inputProvider = InputProvider;
@@ -147,7 +164,9 @@ namespace LittlePeopleWorld.Unity
                 "1 Hand  2 Round  3 Bar\n" +
                 "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
                 "Right click: development rain  Shift+Right click: leaf hang/drop debug\n" +
-                $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}";
+                $"{developmentRainbowKey}: development rainbow\n" +
+                $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Obstacles: {world?.PropObstacles.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}\n" +
+                $"Rainbows: {world?.Rainbows.Count ?? 0}  Rainbow walkers: {RainbowWalkerCount()}";
 
             var rainOcclusionDebugText = maskAnimationController != null
                 ? maskAnimationController.RainOcclusionDebugText
@@ -174,6 +193,25 @@ namespace LittlePeopleWorld.Unity
             }
 
             GUI.Box(new Rect(16f, 16f, 560f, 28f + lineCount * 17f), text, style);
+        }
+
+        int RainbowWalkerCount()
+        {
+            if (world == null)
+            {
+                return 0;
+            }
+
+            var count = 0;
+            foreach (var person in world.LittlePeople)
+            {
+                if (person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
 
         void EnsureRuntime()
@@ -614,6 +652,7 @@ namespace LittlePeopleWorld.Unity
             var plantSpawnSequence = maskAnimationController != null ? maskAnimationController.PlantSpawnSequence : 0;
             var plantBloomSequence = maskAnimationController != null ? maskAnimationController.PlantBloomSequence : 0;
             var flowerBurstSequence = maskAnimationController != null ? maskAnimationController.FlowerBurstSequence : 0;
+            var rainbowSpawnSequence = world != null ? world.RainbowSpawnSequence : 0;
             audioController.UpdateAudio(
                 world,
                 masters,
@@ -621,7 +660,8 @@ namespace LittlePeopleWorld.Unity
                 plantGrowthActive,
                 plantSpawnSequence,
                 plantBloomSequence,
-                flowerBurstSequence);
+                flowerBurstSequence,
+                rainbowSpawnSequence);
         }
 
         InteractionField FindField(int sourceObjectId)
