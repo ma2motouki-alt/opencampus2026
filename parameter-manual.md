@@ -104,7 +104,7 @@ The cloud contact radius itself is defined in `AmbientObjectTypeMaster`.
 |---|---:|---|
 | `enableRainOcclusionByMask` | `true` | Prevent rain from reaching the ground when the vertical rain path intersects the current recognition mask. |
 | `rainOcclusionProbeRadiusPx` | `1` | Horizontal mask-pixel radius checked around each falling rain sample. Higher values make occlusion easier to trigger. |
-| `rainOcclusionTopPaddingPx` | `1` | Skips a small area just below the rain origin to avoid immediate self-blocking near the cloud/rain source. |
+| `rainOcclusionTopPaddingPx` | `12` | Minimum vertical distance from the cloud, in mask pixels, before a recognition mask can block rain. Increase it to allow touching near the cloud without clipping the rain. |
 | `showRainOcclusionDebug` | `false` | Adds rain occlusion counters to the debug overlay when `D` debug display is enabled. |
 | `enableRainVisualOcclusion` | `true` | Shorten the visible rain column when its path intersects the current recognition mask. |
 | `rainOcclusionVisualSmoothingSeconds` | `0.12` | Smooths visible rain-height changes to reduce flicker from noisy masks. Set to `0` for immediate clipping. |

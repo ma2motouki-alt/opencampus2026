@@ -102,7 +102,8 @@ namespace LittlePeopleWorld.Unity
         [Header("Rain Occlusion")]
         [SerializeField] bool enableRainOcclusionByMask = true;
         [SerializeField] int rainOcclusionProbeRadiusPx = 1;
-        [SerializeField] int rainOcclusionTopPaddingPx = 1;
+        [Tooltip("Minimum vertical distance from the cloud before recognition masks can block rain.")]
+        [SerializeField, Min(0)] int rainOcclusionTopPaddingPx = 15;
         [SerializeField] bool showRainOcclusionDebug;
         [SerializeField] bool enableRainVisualOcclusion = true;
         [SerializeField] float rainOcclusionVisualSmoothingSeconds = 0.12f;
@@ -147,6 +148,7 @@ namespace LittlePeopleWorld.Unity
         // 幾何学的な重なり判定だけで十分に安定する。そのため burstMinChangedPixels 相当のしきい値は
         // 廃止し、代わりに「手の輪郭が bloomSphereRadius 以内に入った瞬間」を発火条件にしている。
         [Header("Flower Burst")]
+        [SerializeField, Min(0f)] float flowerBurstTouchRadiusRatio = 0.25f;
         [SerializeField] float burstInitialSpeedPxPerSec = 220f;
         [SerializeField] float burstFreeSeconds = 1.5f;
         [SerializeField] float burstReattachCooldownSeconds = 2.0f;
@@ -729,8 +731,8 @@ namespace LittlePeopleWorld.Unity
                 }
 
                 var bloomPos = plant.BloomPosition;
-                var bloomSphereRadius = Mathf.Max(4f, plant.HeightPx * bloomSphereRadiusRatio);
-                var isTouchingNow = IsHandContourNearBloom(objects, bloomPos, bloomSphereRadius);
+                var touchRadius = Mathf.Max(1f, plantFlowerSizePx * flowerBurstTouchRadiusRatio);
+                var isTouchingNow = IsHandContourNearBloom(objects, bloomPos, touchRadius);
 
                 if (isTouchingNow && !plant.HandTouchingBloom)
                 {
