@@ -89,7 +89,7 @@ namespace LittlePeopleWorld.Unity
         [SerializeField] bool enableRainOcclusionByMask = true;
         [SerializeField] int rainOcclusionProbeRadiusPx = 1;
         [Tooltip("Minimum vertical distance from the cloud before recognition masks can block rain.")]
-        [SerializeField, Min(0)] int rainOcclusionTopPaddingPx = 15;
+        [SerializeField, Min(0)] int rainOcclusionTopPaddingPx = 30;
         [SerializeField] bool showRainOcclusionDebug;
         [SerializeField] bool enableRainVisualOcclusion = true;
         [SerializeField] float rainOcclusionVisualSmoothingSeconds = 0.12f;

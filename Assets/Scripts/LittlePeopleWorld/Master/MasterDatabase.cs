@@ -15,6 +15,7 @@ namespace LittlePeopleWorld.Master
         public MasterTable<InteractionObjectTypeMaster> InteractionObjectTypes { get; }
         public MasterTable<InteractionFieldMaster> InteractionFields { get; }
         public MasterTable<RainbowMaster> Rainbows { get; }
+        public MasterTable<RainbowCloudJumpMaster> RainbowCloudJumps { get; }
         public MasterTable<AmbientObjectTypeMaster> AmbientObjectTypes { get; }
         public MasterTable<VisualEffectMaster> VisualEffects { get; }
         public MasterTable<SoundCueMaster> SoundCues { get; }
@@ -29,6 +30,7 @@ namespace LittlePeopleWorld.Master
             MasterTable<InteractionObjectTypeMaster> interactionObjectTypes,
             MasterTable<InteractionFieldMaster> interactionFields,
             MasterTable<RainbowMaster> rainbows,
+            MasterTable<RainbowCloudJumpMaster> rainbowCloudJumps,
             MasterTable<AmbientObjectTypeMaster> ambientObjectTypes,
             MasterTable<VisualEffectMaster> visualEffects,
             MasterTable<SoundCueMaster> soundCues,
@@ -42,6 +44,7 @@ namespace LittlePeopleWorld.Master
             InteractionObjectTypes = interactionObjectTypes;
             InteractionFields = interactionFields;
             Rainbows = rainbows;
+            RainbowCloudJumps = rainbowCloudJumps;
             AmbientObjectTypes = ambientObjectTypes;
             VisualEffects = visualEffects;
             SoundCues = soundCues;
@@ -68,6 +71,7 @@ namespace LittlePeopleWorld.Master
 
             var littlePeople = new[]
             {
+                //key, name, color, size, speed, curiosity, startle
                 new LittlePersonArchetypeMaster(1, "blue walker", new Color(0.45f, 0.76f, 1f, 1f), 0.018f, 0.12f, 0.78f, 0.35f),
                 new LittlePersonArchetypeMaster(2, "green walker", new Color(0.55f, 1f, 0.72f, 1f), 0.017f, 0.11f, 0.58f, 0.66f),
                 new LittlePersonArchetypeMaster(3, "red walker", new Color(1f, 0.48f, 0.45f, 1f), 0.025f, 0.18f, 0.9f, 0.28f),
@@ -103,7 +107,29 @@ namespace LittlePeopleWorld.Master
 
             var rainbows = new[]
             {
-                new RainbowMaster(1, "rare rain-and-bloom rainbow", 4, 0.50f, 8f, 0.5f, 1.2f, 30f, 0.78f, 0.45f, 32, 0.055f, 0.13f, 0.018f, 0.02f, 0.22f, 0.2f, 0.22f, 1.1f)
+                //虹の見た目を調整0.80f,0.55f(幅、高さ)、32(分割数)、0.055f(虹の幅)、0.13f(虹の高さ)、0.018f(虹の透明度)、0.02f(虹のぼかし)、0.22f(虹の色相)、0.2f(虹の彩度)、0.22f(虹の明度)、1.1f(虹の輝度)
+                new RainbowMaster(1, "rare rain-and-bloom rainbow", 4, 0.50f, 20f, 1.0f, 2.0f, 30f, 0.80f, 0.55f, 32, 0.055f, 0.13f, 0.018f, 0.02f, 0.22f, 0.2f, 0.22f, 1.1f)
+            };
+
+            var rainbowCloudJumps = new[]
+            {
+                new RainbowCloudJumpMaster(
+                    1,
+                    "rainbow to cloud jump",
+                    0.16f,
+                    0.03f,
+                    0.35f,
+                    0.025f,
+                    0.07f,
+                    0.35f,
+                    0.80f,
+                    0.03f,//雲の接触時間
+                    0.025f,
+                    0.30f,
+                    0.70f,
+                    1.5f,
+                    1,
+                    false)
             };
 
             var objectTypes = new[]
@@ -149,6 +175,7 @@ namespace LittlePeopleWorld.Master
                 new MasterTable<InteractionObjectTypeMaster>(objectTypes, x => x.Id),
                 new MasterTable<InteractionFieldMaster>(fields, x => x.Id),
                 new MasterTable<RainbowMaster>(rainbows, x => x.Id),
+                new MasterTable<RainbowCloudJumpMaster>(rainbowCloudJumps, x => x.Id),
                 new MasterTable<AmbientObjectTypeMaster>(ambientObjectTypes, x => x.Id),
                 new MasterTable<VisualEffectMaster>(visualEffects, x => x.Id),
                 new MasterTable<SoundCueMaster>(soundCues, x => x.Id),

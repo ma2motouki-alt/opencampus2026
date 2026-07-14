@@ -47,6 +47,9 @@ Current movement states include:
 - `EdgeWalk`
 - `TransferToSurface`
 - `SurfaceWalk`
+- `JumpToCloud`
+- `TouchingCloud`
+- `ReturnToRainbow`
 - `Falling`
 
 Little people usually live on the inset edge path. When an active rainbow foot is near enough, they transfer onto the rainbow path.
@@ -54,6 +57,8 @@ Little people usually live on the inset edge path. When an active rainbow foot i
 ## Walkable Surface
 
 Current surfaces are generated only from rainbow path points. Each rainbow creates one directed path in each direction. Little people attach at a foot and return to the display edge at the opposite foot.
+
+While walking on an active rainbow, a little person can jump to a nearby cloud. It touches the cloud to start rain, then returns to the same directed rainbow surface. If that source rainbow expires before the return completes, the little person falls to the bottom ground edge.
 
 ## Ambient Objects
 

@@ -21,9 +21,9 @@ Development right-click rain does not satisfy the cloud condition.
 
 ## Lifetime
 
-- Appear: `0.5 seconds`
-- Total duration: `8.0 seconds`
-- Fade: final `1.2 seconds`
+- Appear: `1.0 seconds`
+- Total duration: `20.0 seconds`
+- Fade: final `2.0 seconds`
 - Cooldown after expiry: `30 seconds`
 - Maximum active rainbows: `1`
 
@@ -65,7 +65,7 @@ The sprite is positioned so its feet, rather than its center, sit on the path. I
 
 ## Development Debug
 
-Press `Y` during Play mode to create a rainbow immediately. This ignores flower, rain, and cooldown conditions, but still requires the world to contain a cloud and the fixed sun. The debug overlay shows `Rainbows` and `Rainbow walkers` counts. Press `D` first if the overlay is hidden.
+Press `Y` during Play mode to create a rainbow immediately. This ignores flower, rain, and cooldown conditions, but still requires the world to contain a cloud and the fixed sun. Press `U` to force the nearest rainbow walker to jump to a cloud, ignoring only the distance condition. The debug overlay shows `Rainbows`, `Rainbow walkers`, and `Cloud jumpers` counts. Press `D` first if the overlay is hidden.
 
 ## Audio
 
@@ -80,9 +80,16 @@ While a little person is transferring to or walking on a rainbow, hand fields ar
 
 A hit starts the existing curved fall from the current rainbow position. Falling ignores further touches until the person returns to the display edge.
 
+## Cloud Jump
+
+An active rainbow walker can reserve one nearby, non-raining cloud and jump to its lower contact point. Contact uses the existing ambient reaction path, so it starts the normal rain effect. After a short dwell, the little person follows a curved return trajectory to the closest valid point on the same directed rainbow path, never moving backward along that path.
+
+Hand input does not interrupt `JumpToCloud`, `TouchingCloud`, or `ReturnToRainbow`. If the source rainbow is no longer available, the little person falls to the bottom ground edge instead of returning to an unrelated display edge.
+
 ## Ownership
 
 - `RainbowMaster`: immutable trigger, geometry, lifetime, and movement values.
+- `RainbowCloudJumpMaster`: immutable cloud jump and return tuning.
 - `RainbowInstance`: runtime age, state, opacity, source cloud, and path points.
 - `World`: trigger latch, cooldown, active rainbow list, and derived surfaces.
 - `WorldSpaceMaskAnimationController`: exposes the current visible bloom count.

@@ -122,6 +122,36 @@ namespace LittlePeopleWorld.Domain
             return fallback.sqrMagnitude > 0.000001f ? fallback.normalized : Vector2.right;
         }
 
+        public float ClosestProgress(Vector2 point, out Vector2 closestPoint)
+        {
+            var bestDistance = float.MaxValue;
+            var bestDistanceAlongPath = 0f;
+            closestPoint = pathPoints[0];
+
+            for (var i = 1; i < pathPoints.Count; i++)
+            {
+                var start = pathPoints[i - 1];
+                var end = pathPoints[i];
+                var segment = end - start;
+                var segmentLengthSquared = segment.sqrMagnitude;
+                var segmentProgress = segmentLengthSquared <= 0.000001f
+                    ? 0f
+                    : Mathf.Clamp01(Vector2.Dot(point - start, segment) / segmentLengthSquared);
+                var candidate = start + segment * segmentProgress;
+                var distance = Vector2.SqrMagnitude(point - candidate);
+                if (distance >= bestDistance)
+                {
+                    continue;
+                }
+
+                bestDistance = distance;
+                bestDistanceAlongPath = cumulativeLengths[i - 1] + Vector2.Distance(start, candidate);
+                closestPoint = candidate;
+            }
+
+            return totalLength <= 0.000001f ? 0f : Mathf.Clamp01(bestDistanceAlongPath / totalLength);
+        }
+
         void RebuildPathLengths()
         {
             cumulativeLengths.Clear();

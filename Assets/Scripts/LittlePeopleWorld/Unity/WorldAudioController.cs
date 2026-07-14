@@ -25,9 +25,11 @@ namespace LittlePeopleWorld.Unity
         [SerializeField, Range(0f, 1f)] float flowerBurstVolume = 0.65f;
         [SerializeField, Range(0f, 1f)] float rainbowVolume = 0.65f;
         [SerializeField] float layerFadeSeconds = 1.2f;
+        [SerializeField, Min(0f)] float rainLayerHoldSeconds = 1.5f;
 
         [Header("Layer Switches")]
         [SerializeField] bool playBaseAmbient = true;
+        [SerializeField] bool muteBaseAmbientWhileInteractionObjectsPresent = true;
         [SerializeField] bool enableRainLayer = true;
         [SerializeField] bool enablePlantGrowthLayer = true;
         [SerializeField] bool enablePlantStartOneShot = true;
@@ -47,11 +49,13 @@ namespace LittlePeopleWorld.Unity
         bool hasPlantBloomSequence;
         bool hasFlowerBurstSequence;
         bool hasRainbowSpawnSequence;
+        float rainLayerHoldTimer;
 
         public void UpdateAudio(
             World world,
             MasterDatabase masters,
             float deltaTime,
+            bool hasInteractionObjects,
             bool plantGrowthActive,
             int plantSpawnSequence,
             int plantBloomSequence,
@@ -61,17 +65,20 @@ namespace LittlePeopleWorld.Unity
             EnsureSources();
 
             var hasRain = HasRainColumn(world, masters);
+            var keepRainLayerPlaying = UpdateRainLayerActivity(hasRain, deltaTime);
+            var shouldPlayBaseAmbient = playBaseAmbient &&
+                (!muteBaseAmbientWhileInteractionObjectsPresent || !hasInteractionObjects);
             var volumeMultiplier = Mathf.Clamp01(masterVolume);
             UpdateLoopSource(
                 baseAmbientSource,
                 baseAmbientClip,
-                playBaseAmbient,
+                shouldPlayBaseAmbient,
                 volumeMultiplier * baseAmbientVolume,
                 deltaTime);
             UpdateLoopSource(
                 rainLayerSource,
                 rainLayerClip,
-                enableRainLayer && hasRain,
+                enableRainLayer && keepRainLayerPlaying,
                 volumeMultiplier * rainLayerVolume,
                 deltaTime);
             UpdateLoopSource(
@@ -126,6 +133,7 @@ namespace LittlePeopleWorld.Unity
             hasPlantBloomSequence = false;
             hasFlowerBurstSequence = false;
             hasRainbowSpawnSequence = false;
+            rainLayerHoldTimer = 0f;
         }
 
         void EnsureSources()
@@ -197,6 +205,18 @@ namespace LittlePeopleWorld.Unity
                 source.Stop();
                 source.volume = 0f;
             }
+        }
+
+        bool UpdateRainLayerActivity(bool hasRain, float deltaTime)
+        {
+            if (hasRain)
+            {
+                rainLayerHoldTimer = Mathf.Max(0f, rainLayerHoldSeconds);
+                return true;
+            }
+
+            rainLayerHoldTimer = Mathf.Max(0f, rainLayerHoldTimer - Mathf.Max(0f, deltaTime));
+            return rainLayerHoldTimer > 0f;
         }
 
         void UpdateOneShotSequence(
