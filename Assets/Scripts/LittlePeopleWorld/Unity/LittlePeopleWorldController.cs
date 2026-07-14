@@ -42,6 +42,8 @@ namespace LittlePeopleWorld.Unity
         [Header("Development Rainbow")]
         [SerializeField] bool enableDevelopmentRainbowKey = true;
         [SerializeField] KeyCode developmentRainbowKey = KeyCode.Y;
+        [SerializeField] bool enableDevelopmentCloudJumpKey = true;
+        [SerializeField] KeyCode developmentCloudJumpKey = KeyCode.U;
 
         readonly List<LittlePersonView> littlePersonViews = new();
         readonly Dictionary<int, InteractionObjectView> interactionObjectViews = new();
@@ -95,6 +97,7 @@ namespace LittlePeopleWorld.Unity
             world = orchestrator.World;
             HandleDevelopmentClickRain();
             HandleDevelopmentRainbow();
+            HandleDevelopmentCloudJump();
 
             SyncLittlePeopleViews();
             SyncInteractionObjectViews();
@@ -146,6 +149,19 @@ namespace LittlePeopleWorld.Unity
             }
         }
 
+        void HandleDevelopmentCloudJump()
+        {
+            if (!enableDevelopmentCloudJumpKey || world == null || masters == null)
+            {
+                return;
+            }
+
+            if (UnityEngine.Input.GetKeyDown(developmentCloudJumpKey))
+            {
+                world.TriggerDevelopmentCloudJump(masters);
+            }
+        }
+
         void OnGUI()
         {
             var inputProvider = InputProvider;
@@ -160,9 +176,9 @@ namespace LittlePeopleWorld.Unity
                 "1 Hand  2 Round  3 Mask Stroke\n" +
                 "Click/Drag place and move  Wheel resize  R rotate  Delete remove  D debug\n" +
                 "Right click: development rain  Shift+Right click: leaf hang/drop debug\n" +
-                $"{developmentRainbowKey}: development rainbow\n" +
+                $"{developmentRainbowKey}: development rainbow  {developmentCloudJumpKey}: cloud jump debug\n" +
                 $"Objects: {world?.InteractionObjects.Count ?? 0}  Surfaces: {world?.WalkableSurfaces.Count ?? 0}  Ambient: {world?.AmbientObjects.Count ?? 0}  Effects: {world?.VisualEffects.Count ?? 0}  People: {world?.LittlePeople.Count ?? 0}\n" +
-                $"Rainbows: {world?.Rainbows.Count ?? 0}  Rainbow walkers: {RainbowWalkerCount()}";
+                $"Rainbows: {world?.Rainbows.Count ?? 0}  Rainbow walkers: {RainbowWalkerCount()}  Cloud jumpers: {RainbowCloudJumperCount()}";
 
             var rainOcclusionDebugText = maskAnimationController != null
                 ? maskAnimationController.RainOcclusionDebugText
@@ -202,6 +218,25 @@ namespace LittlePeopleWorld.Unity
             foreach (var person in world.LittlePeople)
             {
                 if (person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow)
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        int RainbowCloudJumperCount()
+        {
+            if (world == null)
+            {
+                return 0;
+            }
+
+            var count = 0;
+            foreach (var person in world.LittlePeople)
+            {
+                if (person.IsUsingCloudJump)
                 {
                     count++;
                 }
@@ -630,6 +665,7 @@ namespace LittlePeopleWorld.Unity
                 world,
                 masters,
                 Time.deltaTime,
+                world != null && world.InteractionObjects.Count > 0,
                 plantGrowthActive,
                 plantSpawnSequence,
                 plantBloomSequence,

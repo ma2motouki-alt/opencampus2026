@@ -15,6 +15,9 @@ namespace LittlePeopleWorld.Domain
         EdgeWalk,
         TransferToSurface,
         SurfaceWalk,
+        JumpToCloud,
+        TouchingCloud,
+        ReturnToRainbow,
         Falling
     }
     public enum LittlePersonEmotion
@@ -48,6 +51,19 @@ namespace LittlePeopleWorld.Domain
         int fallExitEdgeDirection = 1;
         int reconnectCooldownSourceObjectId = -1;
         float reconnectCooldownTimer;
+        int cloudJumpTargetId = -1;
+        int cloudJumpSourceSurfaceId = -1;
+        float cloudJumpSourceProgress;
+        Vector2 cloudJumpStart;
+        Vector2 cloudJumpControl;
+        float cloudJumpTimer;
+        float cloudJumpDurationSeconds;
+        float cloudTouchTimer;
+        Vector2 cloudReturnStart;
+        Vector2 cloudReturnControl;
+        Vector2 cloudReturnEnd;
+        float cloudReturnTimer;
+        float cloudReturnDurationSeconds;
 
         public Guid Id { get; }
         public int ArchetypeId { get; }
@@ -62,6 +78,14 @@ namespace LittlePeopleWorld.Domain
         public float EdgeProgress => edgeProgress;
         public int SurfaceId => surfaceId;
         public WalkableSurfaceKind? ActiveSurfaceKind => activeSurfaceKind;
+        public int CloudJumpTargetId => cloudJumpTargetId;
+        public bool IsUsingCloudJump =>
+            CurrentBehavior == LittlePersonBehaviorKind.JumpToCloud ||
+            CurrentBehavior == LittlePersonBehaviorKind.TouchingCloud ||
+            CurrentBehavior == LittlePersonBehaviorKind.ReturnToRainbow;
+        public bool IsReservingCloudJump =>
+            CurrentBehavior == LittlePersonBehaviorKind.JumpToCloud ||
+            CurrentBehavior == LittlePersonBehaviorKind.TouchingCloud;
 
         public LittlePerson(
             Guid id,
@@ -90,6 +114,7 @@ namespace LittlePeopleWorld.Domain
             float deltaTime,
             IReadOnlyList<InteractionField> fields,
             IReadOnlyList<WalkableSurface> surfaces,
+            IReadOnlyList<AmbientObject> ambientObjects,
             IReadOnlyList<LittlePerson> neighbors,
             MasterDatabase masters,
             TuningParameterMaster tuning)
@@ -118,6 +143,15 @@ namespace LittlePeopleWorld.Domain
                     break;
                 case LittlePersonBehaviorKind.SurfaceWalk:
                     AdvanceSurfaceMotion(deltaTime, surfaces, masters, tuning);
+                    break;
+                case LittlePersonBehaviorKind.JumpToCloud:
+                    AdvanceJumpToCloud(deltaTime, ambientObjects, masters, tuning);
+                    break;
+                case LittlePersonBehaviorKind.TouchingCloud:
+                    AdvanceTouchingCloud(deltaTime, ambientObjects, surfaces, masters, tuning);
+                    break;
+                case LittlePersonBehaviorKind.ReturnToRainbow:
+                    AdvanceReturnToRainbow(deltaTime, surfaces, masters, tuning);
                     break;
                 case LittlePersonBehaviorKind.Falling:
                     AdvanceFalling(deltaTime, tuning);
@@ -287,7 +321,14 @@ namespace LittlePeopleWorld.Domain
             var surface = FindSurfaceById(surfaces, surfaceId);
             if (surface == null)
             {
-                StartFalling(tuning, Position);
+                if (activeSurfaceKind == WalkableSurfaceKind.Rainbow)
+                {
+                    StartFallingFromExpiredRainbow(tuning);
+                }
+                else
+                {
+                    StartFalling(tuning, Position);
+                }
                 AdvanceFalling(deltaTime, tuning);
                 return;
             }
@@ -324,7 +365,14 @@ namespace LittlePeopleWorld.Domain
             var surface = FindSurfaceById(surfaces, surfaceId);
             if (surface == null)
             {
-                StartFalling(tuning, Position);
+                if (activeSurfaceKind == WalkableSurfaceKind.Rainbow)
+                {
+                    StartFallingFromExpiredRainbow(tuning);
+                }
+                else
+                {
+                    StartFalling(tuning, Position);
+                }
                 AdvanceFalling(deltaTime, tuning);
                 return;
             }
@@ -402,6 +450,193 @@ namespace LittlePeopleWorld.Domain
         }
 
 
+        public bool CanStartCloudJump(WalkableSurface surface)
+        {
+            return CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk &&
+                   !surfaceExitReached &&
+                   surface != null &&
+                   surface.Kind == WalkableSurfaceKind.Rainbow &&
+                   surface.Id == surfaceId &&
+                   surface.AllowsNewAttachment;
+        }
+
+        public bool TryStartCloudJump(
+            WalkableSurface surface,
+            AmbientObject cloud,
+            MasterDatabase masters,
+            bool ignoreDistance = false)
+        {
+            if (!CanStartCloudJump(surface) || cloud == null || cloud.Kind != AmbientObjectKind.Cloud)
+            {
+                return false;
+            }
+
+            var settings = masters.RainbowCloudJumps.Get(1);
+            var contactPoint = CloudContactPoint(cloud, settings);
+            if (!ignoreDistance && Vector2.Distance(Position, contactPoint) > settings.SearchDistance)
+            {
+                return false;
+            }
+
+            cloudJumpTargetId = cloud.Id;
+            cloudJumpSourceSurfaceId = surface.Id;
+            cloudJumpSourceProgress = surfaceProgress;
+            cloudJumpStart = Position;
+            cloudJumpControl = BuildCloudArcControl(cloudJumpStart, contactPoint, settings.JumpArcHeight);
+            cloudJumpTimer = 0f;
+            cloudJumpDurationSeconds = DurationForDistance(
+                Vector2.Distance(cloudJumpStart, contactPoint),
+                settings.MinJumpDurationSeconds,
+                settings.MaxJumpDurationSeconds,
+                settings.SearchDistance);
+            cloudTouchTimer = 0f;
+            surfaceExitReached = false;
+            surfaceExitDwellTimer = 0f;
+            CurrentBehavior = LittlePersonBehaviorKind.JumpToCloud;
+            Emotion = LittlePersonEmotion.Curious;
+            TargetObjectId = cloud.Id;
+            Velocity = (contactPoint - cloudJumpStart).normalized;
+            EnsureReaction(masters.Reactions.Get(4));
+            return true;
+        }
+
+        void AdvanceJumpToCloud(
+            float deltaTime,
+            IReadOnlyList<AmbientObject> ambientObjects,
+            MasterDatabase masters,
+            TuningParameterMaster tuning)
+        {
+            var cloud = FindCloudById(ambientObjects, cloudJumpTargetId);
+            if (cloud == null)
+            {
+                StartFallingFromExpiredRainbow(tuning);
+                AdvanceFalling(deltaTime, tuning);
+                return;
+            }
+
+            var settings = masters.RainbowCloudJumps.Get(1);
+            var target = CloudContactPoint(cloud, settings);
+            var previous = Position;
+            cloudJumpTimer += Mathf.Max(0f, deltaTime);
+            var t = Mathf.Clamp01(cloudJumpTimer / Mathf.Max(0.001f, cloudJumpDurationSeconds));
+            Position = QuadraticBezier(cloudJumpStart, cloudJumpControl, target, t);
+            Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
+            TargetObjectId = cloud.Id;
+            Emotion = LittlePersonEmotion.Curious;
+
+            if (t >= 1f || Vector2.Distance(Position, target) <= settings.ArrivalDistance)
+            {
+                Position = target;
+                Velocity = Vector2.zero;
+                cloudTouchTimer = 0f;
+                CurrentBehavior = LittlePersonBehaviorKind.TouchingCloud;
+            }
+        }
+
+        void AdvanceTouchingCloud(
+            float deltaTime,
+            IReadOnlyList<AmbientObject> ambientObjects,
+            IReadOnlyList<WalkableSurface> surfaces,
+            MasterDatabase masters,
+            TuningParameterMaster tuning)
+        {
+            var cloud = FindCloudById(ambientObjects, cloudJumpTargetId);
+            if (cloud == null || FindSurfaceById(surfaces, cloudJumpSourceSurfaceId) == null)
+            {
+                StartFallingFromExpiredRainbow(tuning);
+                AdvanceFalling(deltaTime, tuning);
+                return;
+            }
+
+            var settings = masters.RainbowCloudJumps.Get(1);
+            var previous = Position;
+            Position = CloudContactPoint(cloud, settings);
+            Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
+            TargetObjectId = cloud.Id;
+            Emotion = LittlePersonEmotion.Curious;
+            cloudTouchTimer += Mathf.Max(0f, deltaTime);
+            if (cloudTouchTimer >= settings.CloudTouchDwellSeconds)
+            {
+                StartReturnToRainbow(surfaces, masters);
+            }
+        }
+
+        void StartReturnToRainbow(
+            IReadOnlyList<WalkableSurface> surfaces,
+            MasterDatabase masters)
+        {
+            var surface = FindSurfaceById(surfaces, cloudJumpSourceSurfaceId);
+            if (surface == null || surface.Kind != WalkableSurfaceKind.Rainbow)
+            {
+                return;
+            }
+
+            var settings = masters.RainbowCloudJumps.Get(1);
+            var closestProgress = surface.ClosestProgress(Position, out var closestPoint);
+            var targetProgress = Mathf.Clamp(
+                Mathf.Max(cloudJumpSourceProgress, closestProgress),
+                surface.AttachProgress,
+                surface.ExitProgress);
+            cloudReturnStart = Position;
+            cloudReturnEnd = targetProgress == closestProgress ? closestPoint : surface.PositionAt(targetProgress);
+            cloudReturnControl = BuildCloudArcControl(cloudReturnStart, cloudReturnEnd, settings.ReturnArcHeight);
+            cloudReturnTimer = 0f;
+            cloudReturnDurationSeconds = DurationForDistance(
+                Vector2.Distance(cloudReturnStart, cloudReturnEnd),
+                settings.MinReturnDurationSeconds,
+                settings.MaxReturnDurationSeconds,
+                settings.SearchDistance);
+            surfaceId = surface.Id;
+            surfaceSourceObjectId = surface.SourceObjectId;
+            activeSurfaceKind = surface.Kind;
+            surfaceProgress = targetProgress;
+            surfaceExitReached = false;
+            surfaceExitDwellTimer = 0f;
+            CurrentBehavior = LittlePersonBehaviorKind.ReturnToRainbow;
+            TargetObjectId = surface.SourceObjectId;
+            Velocity = (cloudReturnEnd - cloudReturnStart).normalized;
+        }
+
+        void AdvanceReturnToRainbow(
+            float deltaTime,
+            IReadOnlyList<WalkableSurface> surfaces,
+            MasterDatabase masters,
+            TuningParameterMaster tuning)
+        {
+            var surface = FindSurfaceById(surfaces, cloudJumpSourceSurfaceId);
+            if (surface == null || surface.Kind != WalkableSurfaceKind.Rainbow)
+            {
+                StartFallingFromExpiredRainbow(tuning);
+                AdvanceFalling(deltaTime, tuning);
+                return;
+            }
+
+            var previous = Position;
+            cloudReturnTimer += Mathf.Max(0f, deltaTime);
+            var t = Mathf.Clamp01(cloudReturnTimer / Mathf.Max(0.001f, cloudReturnDurationSeconds));
+            Position = QuadraticBezier(cloudReturnStart, cloudReturnControl, cloudReturnEnd, t);
+            Velocity = deltaTime > 0.0001f ? (Position - previous) / deltaTime : Vector2.zero;
+            Emotion = LittlePersonEmotion.Curious;
+
+            if (t < 1f)
+            {
+                return;
+            }
+
+            Position = cloudReturnEnd;
+            Velocity = Vector2.zero;
+            surfaceId = surface.Id;
+            surfaceSourceObjectId = surface.SourceObjectId;
+            activeSurfaceKind = surface.Kind;
+            surfaceProgress = Mathf.Clamp(surfaceProgress, surface.AttachProgress, surface.ExitProgress);
+            cloudJumpTargetId = -1;
+            cloudJumpSourceSurfaceId = -1;
+            reconnectCooldownSourceObjectId = surface.SourceObjectId;
+            reconnectCooldownTimer = masters.RainbowCloudJumps.Get(1).ReconnectCooldownSeconds;
+            CurrentBehavior = LittlePersonBehaviorKind.SurfaceWalk;
+            TargetObjectId = surface.SourceObjectId;
+        }
+
         void AdvanceFalling(float deltaTime, TuningParameterMaster tuning)
         {
             CurrentBehavior = LittlePersonBehaviorKind.Falling;
@@ -441,6 +676,40 @@ namespace LittlePeopleWorld.Domain
             var shiftedProgress = nearestProgress + fallExitEdgeDirection * tuning.FallLateralDistance / EdgePathLength(tuning.WorldEdgePadding);
             fallEnd = PositionOnEdge(shiftedProgress, tuning.WorldEdgePadding);
             fallControl = BuildFallControlPoint(fallStart, fallEnd, tuning);
+            fallTimer = 0f;
+            CurrentBehavior = LittlePersonBehaviorKind.Falling;
+            Emotion = LittlePersonEmotion.Startled;
+            TargetObjectId = -1;
+            surfaceId = -1;
+            surfaceSourceObjectId = -1;
+            activeSurfaceKind = null;
+            surfaceExitReached = false;
+            surfaceExitDwellTimer = 0f;
+        }
+
+        void StartFallingFromExpiredRainbow(TuningParameterMaster tuning)
+        {
+            fallStart = Position;
+            fallSourceObjectId = surfaceSourceObjectId;
+
+            var edgePadding = Mathf.Clamp(tuning.WorldEdgePadding, 0f, 0.49f);
+            var groundY = 1f - edgePadding;
+            var horizontalDrift = Mathf.Clamp(
+                Velocity.x * tuning.FallDuration * 0.25f,
+                -tuning.FallLateralDistance,
+                tuning.FallLateralDistance);
+            fallEnd = new Vector2(
+                Mathf.Clamp(fallStart.x + horizontalDrift, edgePadding, 1f - edgePadding),
+                groundY);
+
+            var groundProgress = ClosestProgressOnEdge(fallEnd, tuning.WorldEdgePadding, out _);
+            fallExitEdgeDirection = ChooseFallExitDirection(groundProgress, tuning);
+            var verticalLead = Mathf.Max(
+                tuning.FallLaunchDistance,
+                (fallEnd.y - fallStart.y) * 0.28f);
+            fallControl = new Vector2(
+                Mathf.Lerp(fallStart.x, fallEnd.x, 0.55f),
+                Mathf.Min(fallEnd.y, fallStart.y + verticalLead));
             fallTimer = 0f;
             CurrentBehavior = LittlePersonBehaviorKind.Falling;
             Emotion = LittlePersonEmotion.Startled;
@@ -565,6 +834,40 @@ namespace LittlePeopleWorld.Domain
             }
 
             return null;
+        }
+
+        static AmbientObject FindCloudById(IReadOnlyList<AmbientObject> ambientObjects, int id)
+        {
+            if (ambientObjects == null || id < 0)
+            {
+                return null;
+            }
+
+            foreach (var ambientObject in ambientObjects)
+            {
+                if (ambientObject.Id == id && ambientObject.Kind == AmbientObjectKind.Cloud)
+                {
+                    return ambientObject;
+                }
+            }
+
+            return null;
+        }
+
+        static Vector2 CloudContactPoint(AmbientObject cloud, RainbowCloudJumpMaster settings)
+        {
+            return cloud.Position + new Vector2(0f, cloud.Size.y * settings.ContactOffsetRatio);
+        }
+
+        static Vector2 BuildCloudArcControl(Vector2 start, Vector2 end, float arcHeight)
+        {
+            var midpoint = Vector2.Lerp(start, end, 0.5f);
+            return midpoint + Vector2.up * Mathf.Max(0f, arcHeight);
+        }
+
+        static float DurationForDistance(float distance, float minimum, float maximum, float referenceDistance)
+        {
+            return Mathf.Lerp(minimum, maximum, Mathf.Clamp01(distance / Mathf.Max(0.001f, referenceDistance)));
         }
 
         static Vector2 Clamp01(Vector2 value)

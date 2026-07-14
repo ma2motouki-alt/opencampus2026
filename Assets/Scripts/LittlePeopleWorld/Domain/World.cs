@@ -154,6 +154,49 @@ namespace LittlePeopleWorld.Domain
             return true;
         }
 
+        public bool TriggerDevelopmentCloudJump(MasterDatabase masters)
+        {
+            if (masters == null)
+            {
+                return false;
+            }
+
+            var settings = masters.RainbowCloudJumps.Get(1);
+            LittlePerson selectedPerson = null;
+            WalkableSurface selectedSurface = null;
+            AmbientObject selectedCloud = null;
+            var bestDistance = float.MaxValue;
+            foreach (var person in littlePeople)
+            {
+                var surface = FindWalkableSurface(person.SurfaceId);
+                if (!person.CanStartCloudJump(surface))
+                {
+                    continue;
+                }
+
+                foreach (var ambientObject in ambientObjects)
+                {
+                    if (ambientObject.Kind != AmbientObjectKind.Cloud ||
+                        CloudReservationCount(ambientObject.Id) >= settings.MaxConcurrentJumpersPerCloud)
+                    {
+                        continue;
+                    }
+
+                    var distance = Vector2.Distance(person.Position, ambientObject.Position);
+                    if (distance < bestDistance)
+                    {
+                        selectedPerson = person;
+                        selectedSurface = surface;
+                        selectedCloud = ambientObject;
+                        bestDistance = distance;
+                    }
+                }
+            }
+
+            return selectedPerson != null &&
+                   selectedPerson.TryStartCloudJump(selectedSurface, selectedCloud, masters, true);
+        }
+
         public void TriggerDevelopmentRain(MasterDatabase masters, Vector2 position, float width, float durationSeconds)
         {
             if (masters == null)
@@ -193,6 +236,8 @@ namespace LittlePeopleWorld.Domain
             var tuning = masters.TuningParameters.Get(1);
             deltaTime = Mathf.Min(Mathf.Max(0f, deltaTime), tuning.MaxDeltaTime);
 
+            AssignRainbowCloudJumps(masters);
+
             foreach (var person in littlePeople)
             {
                 if (movementPausedLittlePersonIds.Contains(person.Id) &&
@@ -202,7 +247,7 @@ namespace LittlePeopleWorld.Domain
                     continue;
                 }
 
-                person.Advance(deltaTime, interactionFields, walkableSurfaces, littlePeople, masters, tuning);
+                person.Advance(deltaTime, interactionFields, walkableSurfaces, ambientObjects, littlePeople, masters, tuning);
             }
 
             foreach (var ambientObject in ambientObjects)
@@ -215,6 +260,88 @@ namespace LittlePeopleWorld.Domain
             AdvanceRainbows(deltaTime, masters);
             UpdateRainbowTrigger(masters, tuning);
             RebuildRainbowSurfaces(masters);
+        }
+
+        void AssignRainbowCloudJumps(MasterDatabase masters)
+        {
+            var settings = masters.RainbowCloudJumps.Get(1);
+            var reservations = new Dictionary<int, int>();
+            foreach (var person in littlePeople)
+            {
+                if (!person.IsReservingCloudJump || person.CloudJumpTargetId < 0)
+                {
+                    continue;
+                }
+
+                reservations.TryGetValue(person.CloudJumpTargetId, out var count);
+                reservations[person.CloudJumpTargetId] = count + 1;
+            }
+
+            foreach (var person in littlePeople)
+            {
+                var surface = FindWalkableSurface(person.SurfaceId);
+                if (!person.CanStartCloudJump(surface))
+                {
+                    continue;
+                }
+
+                AmbientObject selectedCloud = null;
+                var selectedDistance = float.MaxValue;
+                foreach (var cloud in ambientObjects)
+                {
+                    if (cloud.Kind != AmbientObjectKind.Cloud ||
+                        (!settings.AllowJumpToRainingCloud && cloud.IsReacting) ||
+                        cloud.Position.y > person.Position.y + settings.MaxCloudBelowOffset ||
+                        (reservations.TryGetValue(cloud.Id, out var count) &&
+                         count >= settings.MaxConcurrentJumpersPerCloud))
+                    {
+                        continue;
+                    }
+
+                    var contactPoint = cloud.Position + new Vector2(0f, cloud.Size.y * settings.ContactOffsetRatio);
+                    var distance = Vector2.Distance(person.Position, contactPoint);
+                    if (distance <= settings.SearchDistance && distance < selectedDistance)
+                    {
+                        selectedCloud = cloud;
+                        selectedDistance = distance;
+                    }
+                }
+
+                if (selectedCloud == null || !person.TryStartCloudJump(surface, selectedCloud, masters))
+                {
+                    continue;
+                }
+
+                reservations.TryGetValue(selectedCloud.Id, out var reservedCount);
+                reservations[selectedCloud.Id] = reservedCount + 1;
+            }
+        }
+
+        WalkableSurface FindWalkableSurface(int surfaceId)
+        {
+            foreach (var surface in walkableSurfaces)
+            {
+                if (surface.Id == surfaceId)
+                {
+                    return surface;
+                }
+            }
+
+            return null;
+        }
+
+        int CloudReservationCount(int cloudId)
+        {
+            var count = 0;
+            foreach (var person in littlePeople)
+            {
+                if (person.IsReservingCloudJump && person.CloudJumpTargetId == cloudId)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
         void AdvanceRainbows(float deltaTime, MasterDatabase masters)
         {

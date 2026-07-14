@@ -29,6 +29,7 @@ namespace LittlePeopleWorld.Unity
 
         [Header("Layer Switches")]
         [SerializeField] bool playBaseAmbient = true;
+        [SerializeField] bool muteBaseAmbientWhileInteractionObjectsPresent = true;
         [SerializeField] bool enableRainLayer = true;
         [SerializeField] bool enablePlantGrowthLayer = true;
         [SerializeField] bool enablePlantStartOneShot = true;
@@ -54,6 +55,7 @@ namespace LittlePeopleWorld.Unity
             World world,
             MasterDatabase masters,
             float deltaTime,
+            bool hasInteractionObjects,
             bool plantGrowthActive,
             int plantSpawnSequence,
             int plantBloomSequence,
@@ -64,11 +66,13 @@ namespace LittlePeopleWorld.Unity
 
             var hasRain = HasRainColumn(world, masters);
             var keepRainLayerPlaying = UpdateRainLayerActivity(hasRain, deltaTime);
+            var shouldPlayBaseAmbient = playBaseAmbient &&
+                (!muteBaseAmbientWhileInteractionObjectsPresent || !hasInteractionObjects);
             var volumeMultiplier = Mathf.Clamp01(masterVolume);
             UpdateLoopSource(
                 baseAmbientSource,
                 baseAmbientClip,
-                playBaseAmbient,
+                shouldPlayBaseAmbient,
                 volumeMultiplier * baseAmbientVolume,
                 deltaTime);
             UpdateLoopSource(

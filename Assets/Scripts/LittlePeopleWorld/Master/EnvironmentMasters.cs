@@ -69,6 +69,63 @@ namespace LittlePeopleWorld.Master
             ReconnectCooldownSeconds = Mathf.Max(0f, reconnectCooldownSeconds);
         }
     }
+
+    public sealed class RainbowCloudJumpMaster
+    {
+        public int Id { get; }
+        public string Name { get; }
+        public float SearchDistance { get; }
+        public float MaxCloudBelowOffset { get; }
+        public float ContactOffsetRatio { get; }
+        public float ArrivalDistance { get; }
+        public float JumpArcHeight { get; }
+        public float MinJumpDurationSeconds { get; }
+        public float MaxJumpDurationSeconds { get; }
+        public float CloudTouchDwellSeconds { get; }
+        public float ReturnArcHeight { get; }
+        public float MinReturnDurationSeconds { get; }
+        public float MaxReturnDurationSeconds { get; }
+        public float ReconnectCooldownSeconds { get; }
+        public int MaxConcurrentJumpersPerCloud { get; }
+        public bool AllowJumpToRainingCloud { get; }
+
+        public RainbowCloudJumpMaster(
+            int id,
+            string name,
+            float searchDistance,
+            float maxCloudBelowOffset,
+            float contactOffsetRatio,
+            float arrivalDistance,
+            float jumpArcHeight,
+            float minJumpDurationSeconds,
+            float maxJumpDurationSeconds,
+            float cloudTouchDwellSeconds,
+            float returnArcHeight,
+            float minReturnDurationSeconds,
+            float maxReturnDurationSeconds,
+            float reconnectCooldownSeconds,
+            int maxConcurrentJumpersPerCloud,
+            bool allowJumpToRainingCloud)
+        {
+            Id = id;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            SearchDistance = Mathf.Max(0.001f, searchDistance);
+            MaxCloudBelowOffset = Mathf.Max(0f, maxCloudBelowOffset);
+            ContactOffsetRatio = Mathf.Clamp01(contactOffsetRatio);
+            ArrivalDistance = Mathf.Max(0.001f, arrivalDistance);
+            JumpArcHeight = Mathf.Max(0f, jumpArcHeight);
+            MinJumpDurationSeconds = Mathf.Max(0.001f, minJumpDurationSeconds);
+            MaxJumpDurationSeconds = Mathf.Max(MinJumpDurationSeconds, maxJumpDurationSeconds);
+            CloudTouchDwellSeconds = Mathf.Max(0f, cloudTouchDwellSeconds);
+            ReturnArcHeight = Mathf.Max(0f, returnArcHeight);
+            MinReturnDurationSeconds = Mathf.Max(0.001f, minReturnDurationSeconds);
+            MaxReturnDurationSeconds = Mathf.Max(MinReturnDurationSeconds, maxReturnDurationSeconds);
+            ReconnectCooldownSeconds = Mathf.Max(0f, reconnectCooldownSeconds);
+            MaxConcurrentJumpersPerCloud = Math.Max(1, maxConcurrentJumpersPerCloud);
+            AllowJumpToRainingCloud = allowJumpToRainingCloud;
+        }
+    }
+
     public sealed class AmbientObjectTypeMaster
     {
         public int Id { get; }

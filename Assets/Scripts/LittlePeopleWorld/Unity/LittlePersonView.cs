@@ -43,6 +43,9 @@ namespace LittlePeopleWorld.Unity
         bool plantLookLeft;
         bool handLookLeft;
         bool wasLookingAtHand;
+        bool cloudLookLeft;
+        bool wasLookingAtCloud;
+        bool wasReturningToRainbow;
         int plantLookTargetId = -1;
         float leafHangTimer;
         float leafHangCooldownTimer;
@@ -119,6 +122,10 @@ namespace LittlePeopleWorld.Unity
             var isWalkingOnRainbow = person.ActiveSurfaceKind == WalkableSurfaceKind.Rainbow &&
                                      (person.CurrentBehavior == LittlePersonBehaviorKind.TransferToSurface ||
                                       person.CurrentBehavior == LittlePersonBehaviorKind.SurfaceWalk);
+            var isLookingAtCloud = person.CurrentBehavior == LittlePersonBehaviorKind.JumpToCloud ||
+                                   person.CurrentBehavior == LittlePersonBehaviorKind.TouchingCloud ||
+                                   person.CurrentBehavior == LittlePersonBehaviorKind.ReturnToRainbow;
+            var isReturningToRainbow = person.CurrentBehavior == LittlePersonBehaviorKind.ReturnToRainbow;
             var isLookingAtHand = !isLookingAtPlant &&
                                   person.CurrentBehavior == LittlePersonBehaviorKind.EdgeWalk &&
                                   person.Emotion == LittlePersonEmotion.Startled;
@@ -128,6 +135,14 @@ namespace LittlePeopleWorld.Unity
             }
 
             wasLookingAtHand = isLookingAtHand;
+            if (isLookingAtCloud && (!wasLookingAtCloud || (isReturningToRainbow && !wasReturningToRainbow)))
+            {
+                // The *_up_left asset is used when the target is to the person's right.
+                cloudLookLeft = person.Velocity.x > 0f;
+            }
+
+            wasLookingAtCloud = isLookingAtCloud;
+            wasReturningToRainbow = isReturningToRainbow;
             transform.position = isDroppingFromLeaf
                 ? LeafDropWorldPosition()
                 : isHangingFromLeaf ? leafHangWorldPosition : baseWorldPosition;
@@ -137,6 +152,8 @@ namespace LittlePeopleWorld.Unity
                 ? sprites.HangFrame(CurrentLeafHangFrameIndex(), leafHangLeft)
                 : isLookingAtPlant
                     ? (plantLookLeft ? sprites.LookLeft : sprites.LookRight)
+                    : isLookingAtCloud
+                        ? (cloudLookLeft ? sprites.LookLeft : sprites.LookRight)
                     : isLookingAtHand
                         ? (handLookLeft ? sprites.LookLeft : sprites.LookRight)
                         : sprites.WalkFrame(CurrentFrameIndex(person), ShouldAnimate(person));
@@ -144,7 +161,7 @@ namespace LittlePeopleWorld.Unity
 
             spriteRenderer.sprite = hasSprite ? sprite : RuntimeSpriteFactory.Circle;
             spriteRenderer.color = hasSprite ? Color.white : archetype.BodyColor;
-            spriteRenderer.flipX = !isLookingAtPlant && !isLookingAtHand && !isHangingFromLeaf && !isDroppingFromLeaf &&
+            spriteRenderer.flipX = !isLookingAtPlant && !isLookingAtCloud && !isLookingAtHand && !isHangingFromLeaf && !isDroppingFromLeaf &&
                                    flipAlongMovement && ShouldFlipX(person);
 
             var pulse = person.Emotion == LittlePersonEmotion.Startled
@@ -171,7 +188,7 @@ namespace LittlePeopleWorld.Unity
             glowRenderer.transform.localRotation = Quaternion.identity;
             glowRenderer.transform.localScale = Vector3.one * unit * GlowScale(person);
 
-            transform.rotation = isHangingFromLeaf || isDroppingFromLeaf
+            transform.rotation = isHangingFromLeaf || isDroppingFromLeaf || isLookingAtCloud
                 ? Quaternion.identity
                 : Quaternion.Euler(0f, 0f, RotationDegrees(person));
         }

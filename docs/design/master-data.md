@@ -20,6 +20,7 @@ Master data is immutable while the app is running. Domain objects hold runtime s
 | `InteractionObjectTypeMaster` | Hand, round prop, development mask stroke, and block prop defaults. |
 | `InteractionFieldMaster` | Repel, curiosity, and legacy field definitions. |
 | `RainbowMaster` | Rainbow trigger, lifetime, geometry, walking, and touch tuning. |
+| `RainbowCloudJumpMaster` | Rainbow-to-cloud search, jump, contact, return, and reservation tuning. |
 | `AmbientObjectTypeMaster` | Cloud and star size, drift, touch radius, movement band, and effect link. |
 | `VisualEffectMaster` | Procedural or prefab visual effect definitions. |
 | `SoundCueMaster` | Placeholder for future audio cues. |
@@ -63,6 +64,15 @@ The movement band keeps clouds away from ordinary edge-walk routes.
 - Default size: `0.075 x 0.28`
 - Duration: `0.45`
 - Drop size scale: `0.4`
+
+### Rainbow Cloud Jump
+
+- Search distance: `0.16`
+- Cloud touch dwell: `0.22 seconds`
+- Jump arc height: `0.07`
+- Return arc height: `0.025`
+- Maximum jumpers per cloud: `1`
+- Existing raining clouds are excluded from new jump targets.
 
 ### Global Tuning
 
